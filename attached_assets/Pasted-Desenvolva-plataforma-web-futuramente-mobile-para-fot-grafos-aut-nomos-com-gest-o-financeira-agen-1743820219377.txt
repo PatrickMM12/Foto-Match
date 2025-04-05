@@ -1,0 +1,68 @@
+Desenvolva plataforma web (futuramente mobile) para fotógrafos autônomos com gestão financeira, agendamento e matchmaking cliente-fotógrafo.
+Requisitos Principais
+Acesso
+
+Landing page atrativa
+Login/registro para fotógrafos e clientes
+Recuperação de senha via Resend
+
+Para Fotógrafos
+
+Perfil: Cadastro com portfólio e integração Instagram
+Finanças:
+
+Dashboard receitas/despesas
+Categorização específica para transações fotográficas
+
+Agenda:
+
+Calendário com visões diária/semanal/mensal
+Bloqueio de horários reservados
+
+Sessões:
+
+Cadastro com: cliente, local, tipo, fotos pacote, fotos adicionais, valores do pacote e fotos adicionais
+Controle de pagamentos
+
+Para Clientes
+
+Busca: Mapa Google com fotógrafos e filtros
+Avaliações: Sistema por critérios (qualidade, profissionalismo)
+Reservas: Visualização de disponibilidade nos dias e horários que fotografo tem disponibilidade e solicitação de agendamento
+Pagamentos: Processamento seguro via gateway
+
+Tecnologias
+
+Frontend: React/Next.js com design responsivo
+Backend: Supabase (banco, auth, storage)
+APIs: Google Maps, Instagram, Resend
+Pagamentos: Integração com gateway
+
+Arquitetura BD
+
+Tabelas principais: Users, Sessions, Transactions, Reviews
+
+Fluxos
+
+Fotógrafo: Cadastro → Perfil → Cadatsrar serviços →Disponibilidade → Aprovar solicitação de agendamento → Acompanhar status de agendamento/pagamento →Gestão financeira
+Cliente: Cadastro → Busca no mapa → Visualização → Agendamento → Pagamento → Avaliação
+
+Segurança
+
+Autenticação robusta via Supabase Auth
+Permissões granulares por perfil de usuário
+Proteção contra ataques comuns (CSRF, XSS, SQL Injection)
+Conformidade com LGPD para dados pessoais
+
+Funcionalidades Avançadas
+
+Sistema de notificações em tempo real
+Chat integrado entre cliente e fotógrafo
+Assinatura premium para fotógrafos com recursos avançados
+Análise preditiva financeira para fotógrafos
+
+Prioridades
+
+Interface intuitiva para fotógrafos sem experiência técnica
+Desempenho otimizado para imagens
+Modo offline
