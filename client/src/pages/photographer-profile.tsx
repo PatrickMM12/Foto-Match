@@ -2,6 +2,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useEffect } from 'react';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
@@ -58,7 +59,7 @@ const PhotographerProfile = () => {
   });
 
   // Update form values when data is loaded
-  React.useEffect(() => {
+  useEffect(() => {
     if (data && photographerProfile) {
       form.reset({
         name: data.name || '',
