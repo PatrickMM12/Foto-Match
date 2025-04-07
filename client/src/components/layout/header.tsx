@@ -21,22 +21,50 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest('POST', '/api/auth/logout', {});
+      // Obter o token do localStorage para incluir no cabeçalho
+      const token = localStorage.getItem('authToken');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers,
+        credentials: 'include'
+      });
+      
+      return response;
     },
     onSuccess: () => {
+      // Remover o token do localStorage
+      localStorage.removeItem('authToken');
+      console.log('Token removido do localStorage durante logout');
+      
       toast({
         title: 'Logout realizado',
         description: 'Você saiu da sua conta com sucesso.',
       });
-      navigate('/');
-      window.location.reload(); // Ensure all auth state is cleared
+      
+      // Redirecionar para a página inicial
+      window.location.href = '/';
     },
     onError: (error: any) => {
+      // Tentar remover o token mesmo em caso de erro
+      localStorage.removeItem('authToken');
+      console.log('Token removido do localStorage após erro no logout');
+      
       toast({
         title: 'Erro ao fazer logout',
         description: error.message || 'Ocorreu um erro ao sair da conta.',
         variant: 'destructive',
       });
+      
+      // Redirecionar para a página inicial mesmo em caso de erro
+      window.location.href = '/';
     },
   });
 
@@ -63,25 +91,17 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
 
         <div className="flex items-center space-x-4 sm:space-x-6">
           <nav className="hidden md:flex items-center space-x-6">
-            <Link href="/">
-              <a className={`transition-colors ${isActive('/') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
-                Início
-              </a>
+            <Link href="/" className={`transition-colors ${isActive('/') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
+              Início
             </Link>
-            <Link href="/#how-it-works">
-              <a className={`transition-colors ${isActive('/#how-it-works') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
-                Como Funciona
-              </a>
+            <Link href="/#how-it-works" className={`transition-colors ${isActive('/#how-it-works') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
+              Como Funciona
             </Link>
-            <Link href="/#features">
-              <a className={`transition-colors ${isActive('/#features') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
-                Recursos
-              </a>
+            <Link href="/#features" className={`transition-colors ${isActive('/#features') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
+              Recursos
             </Link>
-            <Link href="/#pricing">
-              <a className={`transition-colors ${isActive('/#pricing') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
-                Preços
-              </a>
+            <Link href="/#pricing" className={`transition-colors ${isActive('/#pricing') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
+              Preços
             </Link>
           </nav>
 
@@ -118,54 +138,42 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
                   {user.userType === 'photographer' ? (
                     <>
                       <DropdownMenuItem asChild>
-                        <Link href="/photographer/dashboard">
-                          <a className="w-full cursor-pointer flex items-center">
+                        <Link href="/photographer/dashboard" className="w-full cursor-pointer flex items-center">
                             <FileText className="mr-2 h-4 w-4" />
                             <span>Dashboard</span>
-                          </a>
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/photographer/profile">
-                          <a className="w-full cursor-pointer flex items-center">
+                        <Link href="/photographer/profile" className="w-full cursor-pointer flex items-center">
                             <User className="mr-2 h-4 w-4" />
                             <span>Perfil</span>
-                          </a>
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/photographer/calendar">
-                          <a className="w-full cursor-pointer flex items-center">
+                        <Link href="/photographer/calendar" className="w-full cursor-pointer flex items-center">
                             <Calendar className="mr-2 h-4 w-4" />
                             <span>Agenda</span>
-                          </a>
                         </Link>
                       </DropdownMenuItem>
                     </>
                   ) : (
                     <>
                       <DropdownMenuItem asChild>
-                        <Link href="/client/search">
-                          <a className="w-full cursor-pointer flex items-center">
+                        <Link href="/client/search" className="w-full cursor-pointer flex items-center">
                             <Search className="mr-2 h-4 w-4" />
                             <span>Buscar Fotógrafos</span>
-                          </a>
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/client/bookings">
-                          <a className="w-full cursor-pointer flex items-center">
+                        <Link href="/client/bookings" className="w-full cursor-pointer flex items-center">
                             <Calendar className="mr-2 h-4 w-4" />
                             <span>Minhas Reservas</span>
-                          </a>
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/client/profile">
-                          <a className="w-full cursor-pointer flex items-center">
+                        <Link href="/client/profile" className="w-full cursor-pointer flex items-center">
                             <User className="mr-2 h-4 w-4" />
                             <span>Meu Perfil</span>
-                          </a>
                         </Link>
                       </DropdownMenuItem>
                     </>
@@ -228,56 +236,40 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
 
                     {user.userType === 'photographer' ? (
                       <>
-                        <Link href="/photographer/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
-                          <a className="flex items-center py-2 font-medium">
-                            <FileText className="mr-2 h-4 w-4" />
-                            Dashboard
-                          </a>
+                        <Link href="/photographer/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-2 font-medium">
+                          <FileText className="mr-2 h-4 w-4" />
+                          Dashboard
                         </Link>
-                        <Link href="/photographer/profile" onClick={() => setIsMobileMenuOpen(false)}>
-                          <a className="flex items-center py-2 font-medium">
-                            <User className="mr-2 h-4 w-4" />
-                            Perfil
-                          </a>
+                        <Link href="/photographer/profile" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-2 font-medium">
+                          <User className="mr-2 h-4 w-4" />
+                          Perfil
                         </Link>
-                        <Link href="/photographer/calendar" onClick={() => setIsMobileMenuOpen(false)}>
-                          <a className="flex items-center py-2 font-medium">
-                            <Calendar className="mr-2 h-4 w-4" />
-                            Agenda
-                          </a>
+                        <Link href="/photographer/calendar" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-2 font-medium">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          Agenda
                         </Link>
-                        <Link href="/photographer/sessions" onClick={() => setIsMobileMenuOpen(false)}>
-                          <a className="flex items-center py-2 font-medium">
-                            <Camera className="mr-2 h-4 w-4" />
-                            Sessões
-                          </a>
+                        <Link href="/photographer/sessions" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-2 font-medium">
+                          <Camera className="mr-2 h-4 w-4" />
+                          Sessões
                         </Link>
-                        <Link href="/photographer/finances" onClick={() => setIsMobileMenuOpen(false)}>
-                          <a className="flex items-center py-2 font-medium">
-                            <FileText className="mr-2 h-4 w-4" />
-                            Finanças
-                          </a>
+                        <Link href="/photographer/finances" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-2 font-medium">
+                          <FileText className="mr-2 h-4 w-4" />
+                          Finanças
                         </Link>
                       </>
                     ) : (
                       <>
-                        <Link href="/client/search" onClick={() => setIsMobileMenuOpen(false)}>
-                          <a className="flex items-center py-2 font-medium">
-                            <Search className="mr-2 h-4 w-4" />
-                            Buscar Fotógrafos
-                          </a>
+                        <Link href="/client/search" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-2 font-medium">
+                          <Search className="mr-2 h-4 w-4" />
+                          Buscar Fotógrafos
                         </Link>
-                        <Link href="/client/bookings" onClick={() => setIsMobileMenuOpen(false)}>
-                          <a className="flex items-center py-2 font-medium">
-                            <Calendar className="mr-2 h-4 w-4" />
-                            Minhas Reservas
-                          </a>
+                        <Link href="/client/bookings" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-2 font-medium">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          Minhas Reservas
                         </Link>
-                        <Link href="/client/profile" onClick={() => setIsMobileMenuOpen(false)}>
-                          <a className="flex items-center py-2 font-medium">
-                            <User className="mr-2 h-4 w-4" />
-                            Meu Perfil
-                          </a>
+                        <Link href="/client/profile" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center py-2 font-medium">
+                          <User className="mr-2 h-4 w-4" />
+                          Meu Perfil
                         </Link>
                       </>
                     )}
@@ -298,17 +290,17 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
                   </>
                 ) : (
                   <>
-                    <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
-                      <a className="py-2 font-medium">Início</a>
+                    <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="py-2 font-medium">
+                      Início
                     </Link>
-                    <Link href="/#how-it-works" onClick={() => setIsMobileMenuOpen(false)}>
-                      <a className="py-2 font-medium">Como Funciona</a>
+                    <Link href="/#how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="py-2 font-medium">
+                      Como Funciona
                     </Link>
-                    <Link href="/#features" onClick={() => setIsMobileMenuOpen(false)}>
-                      <a className="py-2 font-medium">Recursos</a>
+                    <Link href="/#features" onClick={() => setIsMobileMenuOpen(false)} className="py-2 font-medium">
+                      Recursos
                     </Link>
-                    <Link href="/#pricing" onClick={() => setIsMobileMenuOpen(false)}>
-                      <a className="py-2 font-medium">Preços</a>
+                    <Link href="/#pricing" onClick={() => setIsMobileMenuOpen(false)} className="py-2 font-medium">
+                      Preços
                     </Link>
                     <div className="border-t pt-4 mt-4 flex flex-col space-y-2">
                       <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>

@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
 import { Calendar } from '@/components/ui/calendar';
-import { TimeGrid } from '@/components/ui/time-grid';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, eachDayOfInterval, startOfWeek, endOfWeek, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarClock, Clock, X, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { DayPickerRangeProps } from 'react-day-picker';
 
 // Define the time slots for the day
 const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => i).flatMap(hour => [
@@ -122,17 +122,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                   onClick={() => handleTimeSlotClick(selectedDate, time)}
                 >
                   <div className="w-16 text-sm font-medium">{time}</div>
-                  <div className="flex-1 ml-2">
-                    {booking ? (
-                      <div className="text-sm">{booking.title} ({booking.duration} min)</div>
-                    ) : isBlocked ? (
-                      <div className="text-sm flex items-center"><X className="h-3 w-3 mr-1" /> Bloqueado</div>
-                    ) : isAvailable ? (
-                      <div className="text-sm flex items-center"><Check className="h-3 w-3 mr-1" /> Disponível</div>
-                    ) : (
-                      <div className="text-sm text-gray-500">Não configurado</div>
-                    )}
-                  </div>
+                  
+                  {booking ? (
+                    <div className="text-sm">{booking.title} ({booking.duration} min)</div>
+                  ) : isBlocked ? (
+                    <div className="text-sm flex items-center"><X className="h-3 w-3 mr-1" /> Bloqueado</div>
+                  ) : isAvailable ? (
+                    <div className="text-sm flex items-center"><Check className="h-3 w-3 mr-1" /> Disponível</div>
+                  ) : (
+                    <div className="text-sm text-gray-500">Não configurado</div>
+                  )}
                 </div>
               );
             })}
@@ -182,25 +181,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                     
                     return (
                       <div
-                        key={`${day}-${time}`}
-                        className={`p-1 text-xs rounded ${
+                        key={`${day.toString()}-${time}`}
+                        className={`text-xs rounded-md p-1 text-center ${
                           booking
                             ? 'bg-blue-100 text-blue-800'
                             : isBlocked
                               ? 'bg-red-100 text-red-800'
                               : isAvailable
                                 ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
+                                : 'bg-gray-100 text-gray-500'
                         } ${isBlockingTime ? 'cursor-pointer' : 'cursor-default'}`}
-                        onClick={() => {
-                          setSelectedDate(day);
-                          if (isBlockingTime) handleTimeSlotClick(day, time);
-                        }}
+                        onClick={() => isBlockingTime && handleTimeSlotClick(day, time)}
                       >
-                        <div className="font-medium">{time}</div>
-                        {booking ? (
-                          <div className="truncate">{booking.title}</div>
-                        ) : null}
+                        {time}
+                        {booking && (
+                          <div className="truncate mt-1 font-medium">{booking.title}</div>
+                        )}
                       </div>
                     );
                   })}
@@ -215,6 +211,23 @@ const CalendarView: React.FC<CalendarViewProps> = ({
 
   // Render the month view (calendar)
   const renderMonthView = () => {
+    // Personalização do dia no calendário para mostrar status
+    const dayClassNames = (date: Date): string => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      
+      // Verificar status do dia
+      const hasBooking = bookings.some(booking => isSameDay(booking.date, date));
+      const isAvailable = availableTimes[dateStr] && availableTimes[dateStr].length > 0;
+      const isFullyBlocked = blockedTimes[dateStr] && 
+                              blockedTimes[dateStr].length === TIME_SLOTS.length;
+      
+      if (hasBooking) return 'border-2 border-primary bg-blue-50';
+      if (isAvailable) return 'bg-green-50 text-green-600 font-medium';
+      if (isFullyBlocked) return 'bg-red-50 text-red-600 opacity-70';
+      
+      return '';
+    };
+
     return (
       <div>
         <Calendar
@@ -225,9 +238,32 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           locale={ptBR}
           modifiers={{
             booked: bookings.map(booking => booking.date),
+            available: Object.keys(availableTimes).map(dateStr => {
+              try {
+                const parts = dateStr.split('-').map(p => parseInt(p));
+                return new Date(parts[0], parts[1] - 1, parts[2]);
+              } catch (e) {
+                return new Date(); // fallback
+              }
+            }),
+            blocked: Object.keys(blockedTimes)
+              .filter(dateStr => blockedTimes[dateStr].length === TIME_SLOTS.length)
+              .map(dateStr => {
+                try {
+                  const parts = dateStr.split('-').map(p => parseInt(p));
+                  return new Date(parts[0], parts[1] - 1, parts[2]);
+                } catch (e) {
+                  return new Date(); // fallback
+                }
+              }),
           }}
           modifiersClassNames={{
-            booked: 'border-2 border-primary',
+            booked: 'border-2 border-primary bg-blue-50',
+            available: 'bg-green-50 text-green-600 font-medium',
+            blocked: 'bg-red-50 text-red-600 opacity-70'
+          }}
+          classNames={{
+            day: 'rounded-full'
           }}
         />
         
@@ -238,7 +274,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             </h3>
             
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-              {['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'].map((time) => {
+              {TIME_SLOTS.filter((_, i) => i % 2 === 0).map(time => {
                 const { available, blocked, booked } = getDateTimeSlots(selectedDate);
                 const isBlocked = blocked.includes(time);
                 const isAvailable = available.includes(time);

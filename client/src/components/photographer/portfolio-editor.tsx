@@ -22,7 +22,7 @@ interface PortfolioItem {
 }
 
 interface PortfolioEditorProps {
-  userId: number;
+  userId?: number;
 }
 
 const PortfolioEditor: React.FC<PortfolioEditorProps> = ({ userId }) => {
@@ -36,9 +36,11 @@ const PortfolioEditor: React.FC<PortfolioEditorProps> = ({ userId }) => {
   const [imagePreview, setImagePreview] = useState('');
 
   // Fetch portfolio items
-  const { data: portfolioItems, isLoading } = useQuery({
+  const { data: portfolioItems = [], isLoading, refetch: refetchPortfolio } = useQuery<PortfolioItem[]>({
     queryKey: [`/api/portfolio/${userId}`],
     enabled: !!userId,
+    staleTime: 0, // Força revalidação ao refetch
+    refetchOnWindowFocus: true, // Recarrega dados quando a janela ganha foco
   });
 
   // Add portfolio item mutation
@@ -48,6 +50,12 @@ const PortfolioEditor: React.FC<PortfolioEditorProps> = ({ userId }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/portfolio/${userId}`] });
+      
+      // Recarregar dados imediatamente
+      refetchPortfolio().then(() => {
+        console.log('Portfólio recarregado após adicionar item');
+      });
+      
       toast({
         title: 'Item adicionado',
         description: 'O item foi adicionado ao seu portfólio com sucesso.',
@@ -72,6 +80,12 @@ const PortfolioEditor: React.FC<PortfolioEditorProps> = ({ userId }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/portfolio/${userId}`] });
+      
+      // Recarregar dados imediatamente
+      refetchPortfolio().then(() => {
+        console.log('Portfólio recarregado após remover item');
+      });
+      
       toast({
         title: 'Item removido',
         description: 'O item foi removido do seu portfólio com sucesso.',
@@ -93,6 +107,12 @@ const PortfolioEditor: React.FC<PortfolioEditorProps> = ({ userId }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/portfolio/${userId}`] });
+      
+      // Recarregar dados imediatamente
+      refetchPortfolio().then(() => {
+        console.log('Portfólio recarregado após alterar destaque');
+      });
+      
       toast({
         title: 'Status atualizado',
         description: 'O status de destaque foi atualizado com sucesso.',
@@ -106,6 +126,35 @@ const PortfolioEditor: React.FC<PortfolioEditorProps> = ({ userId }) => {
       });
     },
   });
+
+  // Usar um efeito para garantir que os dados do portfólio sejam atualizados regularmente
+  useEffect(() => {
+    console.log('PortfolioEditor montado - carregando dados do portfólio...');
+    
+    // Recarregar dados do portfólio ao montar o componente
+    if (userId) {
+      refetchPortfolio().then(() => {
+        console.log('Dados do portfólio carregados na montagem do componente');
+      }).catch(error => {
+        console.error('Erro ao carregar dados do portfólio:', error);
+      });
+    }
+    
+    // Verificar se há atualizações a cada 30 segundos
+    const intervalId = setInterval(() => {
+      if (userId) {
+        refetchPortfolio().then(() => {
+          console.log('Verificação periódica: Dados do portfólio atualizados');
+        });
+      }
+    }, 30000);
+    
+    // Limpar o intervalo quando o componente for desmontado
+    return () => {
+      clearInterval(intervalId);
+      console.log('PortfolioEditor desmontado - intervalo limpo');
+    };
+  }, [userId, refetchPortfolio]);
 
   // Handle image URL change with preview
   const handleImageUrlChange = (url: string) => {

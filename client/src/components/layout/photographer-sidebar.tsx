@@ -82,17 +82,17 @@ const PhotographerSidebar = () => {
       <div className="flex flex-col flex-1 py-6 px-4">
         <nav className="space-y-2">
           {navItems.map((item) => (
-            <Link key={item.path} href={item.path}>
-              <a
-                className={`flex items-center space-x-3 px-3 py-2 rounded-md transition-colors ${
-                  isActive(item.path)
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </a>
+            <Link 
+              key={item.path} 
+              href={item.path}
+              className={`flex items-center space-x-3 px-3 py-2 rounded-md transition-colors ${
+                isActive(item.path)
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {item.icon}
+              <span>{item.label}</span>
             </Link>
           ))}
         </nav>
@@ -137,18 +137,18 @@ const PhotographerSidebar = () => {
           <div className="flex flex-col flex-1 py-6 px-4">
             <nav className="space-y-2">
               {navItems.map((item) => (
-                <Link key={item.path} href={item.path}>
-                  <a
-                    className={`flex items-center space-x-3 px-3 py-2 rounded-md transition-colors ${
-                      isActive(item.path)
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    {item.icon}
-                    <span>{item.label}</span>
-                  </a>
+                <Link 
+                  key={item.path} 
+                  href={item.path}
+                  className={`flex items-center space-x-3 px-3 py-2 rounded-md transition-colors ${
+                    isActive(item.path)
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
                 </Link>
               ))}
             </nav>

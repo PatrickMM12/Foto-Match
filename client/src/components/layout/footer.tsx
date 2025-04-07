@@ -34,23 +34,23 @@ const Footer = () => {
             <h4 className="font-semibold text-lg mb-4">Plataforma</h4>
             <ul className="space-y-3">
               <li>
-                <Link href="/#how-it-works">
-                  <a className="text-gray-400 hover:text-white transition-colors">Para Fotógrafos</a>
+                <Link href="/#how-it-works" className="text-gray-400 hover:text-white transition-colors">
+                  Para Fotógrafos
                 </Link>
               </li>
               <li>
-                <Link href="/#how-it-works">
-                  <a className="text-gray-400 hover:text-white transition-colors">Para Clientes</a>
+                <Link href="/#how-it-works" className="text-gray-400 hover:text-white transition-colors">
+                  Para Clientes
                 </Link>
               </li>
               <li>
-                <Link href="/#pricing">
-                  <a className="text-gray-400 hover:text-white transition-colors">Preços</a>
+                <Link href="/#pricing" className="text-gray-400 hover:text-white transition-colors">
+                  Preços
                 </Link>
               </li>
               <li>
-                <Link href="/#testimonials">
-                  <a className="text-gray-400 hover:text-white transition-colors">Depoimentos</a>
+                <Link href="/#testimonials" className="text-gray-400 hover:text-white transition-colors">
+                  Depoimentos
                 </Link>
               </li>
               <li>
@@ -63,28 +63,28 @@ const Footer = () => {
             <h4 className="font-semibold text-lg mb-4">Recursos</h4>
             <ul className="space-y-3">
               <li>
-                <Link href="/#features">
-                  <a className="text-gray-400 hover:text-white transition-colors">Gestão Financeira</a>
+                <Link href="/#features" className="text-gray-400 hover:text-white transition-colors">
+                  Gestão Financeira
                 </Link>
               </li>
               <li>
-                <Link href="/#features">
-                  <a className="text-gray-400 hover:text-white transition-colors">Agendamento</a>
+                <Link href="/#features" className="text-gray-400 hover:text-white transition-colors">
+                  Agendamento
                 </Link>
               </li>
               <li>
-                <Link href="/#features">
-                  <a className="text-gray-400 hover:text-white transition-colors">Portfólio</a>
+                <Link href="/#features" className="text-gray-400 hover:text-white transition-colors">
+                  Portfólio
                 </Link>
               </li>
               <li>
-                <Link href="/#features">
-                  <a className="text-gray-400 hover:text-white transition-colors">Pagamentos</a>
+                <Link href="/#features" className="text-gray-400 hover:text-white transition-colors">
+                  Pagamentos
                 </Link>
               </li>
               <li>
-                <Link href="/#features">
-                  <a className="text-gray-400 hover:text-white transition-colors">Avaliações</a>
+                <Link href="/#features" className="text-gray-400 hover:text-white transition-colors">
+                  Avaliações
                 </Link>
               </li>
             </ul>
