@@ -1,6 +1,16 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { supabase } from "./supabase";
+
+// Verificar conexão com o Supabase
+supabase.auth.getSession().then(({ data, error }) => {
+  if (error) {
+    console.error('Erro ao conectar com o Supabase:', error);
+  } else {
+    log('Conexão com o Supabase estabelecida com sucesso');
+  }
+});
 
 const app = express();
 app.use(express.json());
@@ -56,10 +66,9 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
+  // Use a porta definida por variável de ambiente ou 3000 como padrão
+  // para evitar conflitos com outros serviços
+  const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
   server.listen({
     port,
     host: "0.0.0.0",

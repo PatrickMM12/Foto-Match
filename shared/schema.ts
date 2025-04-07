@@ -5,6 +5,7 @@ import { z } from "zod";
 // User table - base for both photographers and clients
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
+  auth_id: text("auth_id").unique(), // ID do usuário no Supabase Auth
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
@@ -140,7 +141,7 @@ export const insertPortfolioItemSchema = createInsertSchema(portfolioItems).omit
 // Types
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type User = typeof users.$inferSelect & { auth_id?: string }; // Adicionando auth_id ao tipo User
 
 export type InsertPhotographerProfile = z.infer<typeof insertPhotographerProfileSchema>;
 export type PhotographerProfile = typeof photographerProfiles.$inferSelect;

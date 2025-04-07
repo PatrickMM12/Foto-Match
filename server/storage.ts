@@ -9,6 +9,8 @@ import {
   UserWithProfile
 } from "@shared/schema";
 
+import { supabaseStorage } from './supabase-storage';
+
 export interface IStorage {
   // Users
   getUser(id: number): Promise<User | undefined>;
@@ -59,6 +61,9 @@ export interface IStorage {
   // Search
   searchPhotographers(query: string, lat?: number, lng?: number, radius?: number): Promise<UserWithProfile[]>;
 }
+
+// Exportar a implementação do Supabase como padrão
+export const storage = supabaseStorage;
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
@@ -366,5 +371,3 @@ export class MemStorage implements IStorage {
     return deg * (Math.PI/180);
   }
 }
-
-export const storage = new MemStorage();

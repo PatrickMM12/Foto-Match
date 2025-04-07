@@ -4,142 +4,233 @@ import { storage } from "./storage";
 import { userRegisterSchema, userLoginSchema, insertPhotographerProfileSchema, insertServiceSchema, insertSessionSchema, insertTransactionSchema, insertReviewSchema, insertPortfolioItemSchema } from "@shared/schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
-import session from "express-session";
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
+import { supabase } from "./supabase";
 import bcrypt from "bcryptjs";
-import MemoryStore from "memorystore";
 
-const SessionStore = MemoryStore(session);
+// Adicionar declaração para o usuário no objeto Request
+declare global {
+  namespace Express {
+    interface Request {
+      user?: any;
+    }
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Set up session
-  app.use(
-    session({
-      secret: process.env.SESSION_SECRET || "foto-connect-secret",
-      resave: false,
-      saveUninitialized: false,
-      cookie: { secure: process.env.NODE_ENV === "production", maxAge: 24 * 60 * 60 * 1000 },
-      store: new SessionStore({
-        checkPeriod: 86400000, // prune expired entries every 24h
-      }),
-    })
-  );
+  // Middleware para verificar autenticação com Supabase
+  const isAuthenticated = async (req: Request, res: Response, next: Function) => {
+    // Verificar se o token de autenticação está presente no cabeçalho
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
-  // Set up passport
-  app.use(passport.initialize());
-  app.use(passport.session());
-
-  // Configure passport local strategy
-  passport.use(
-    new LocalStrategy(
-      { usernameField: "email" },
-      async (email, password, done) => {
-        try {
-          const user = await storage.getUserByEmail(email);
-          if (!user) {
-            return done(null, false, { message: "Incorrect email or password" });
-          }
-
-          const isValid = await bcrypt.compare(password, user.password);
-          if (!isValid) {
-            return done(null, false, { message: "Incorrect email or password" });
-          }
-
-          return done(null, user);
-        } catch (error) {
-          return done(error);
-        }
-      }
-    )
-  );
-
-  passport.serializeUser((user: any, done) => {
-    done(null, user.id);
-  });
-
-  passport.deserializeUser(async (id: number, done) => {
+    const token = authHeader.split(' ')[1];
+    
     try {
-      const user = await storage.getUser(id);
-      done(null, user);
+      // Verificar o token com o Supabase
+      const { data, error } = await supabase.auth.getUser(token);
+      
+      if (error || !data.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Buscar o usuário no banco de dados
+      const user = await storage.getUserByEmail(data.user.email || '');
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Adicionar o usuário ao objeto de requisição
+      req.user = user;
+      next();
     } catch (error) {
-      done(error);
+      console.error('Authentication error:', error);
+      return res.status(401).json({ message: "Authentication error" });
     }
+  };
+  
+  // Adicionar middleware para extrair token de autenticação
+  app.use(async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const { data } = await supabase.auth.getUser(token);
+        if (data.user) {
+          const user = await storage.getUserByEmail(data.user.email || '');
+          if (user) {
+            req.user = user;
+          }
+        }
+      } catch (error) {
+        // Ignorar erros de autenticação aqui, o middleware isAuthenticated lidará com eles
+      }
+    }
+    next();
   });
 
-  // Helper function to validate user is authenticated
-  const isAuthenticated = (req: Request, res: Response, next: Function) => {
-    if (req.isAuthenticated()) {
-      return next();
-    }
-    res.status(401).json({ message: "Unauthorized" });
-  };
 
   // Routes
   app.post("/api/auth/register", async (req, res) => {
     try {
       const validatedData = userRegisterSchema.parse(req.body);
       
-      // Check if user already exists
-      const existingUser = await storage.getUserByEmail(validatedData.email);
-      if (existingUser) {
-        return res.status(400).json({ message: "Email already in use" });
-      }
-
-      // Hash password
-      const hashedPassword = await bcrypt.hash(validatedData.password, 10);
+      console.log(`Tentando registrar usuário: ${validatedData.email}`);
       
-      // Create user
-      const user = await storage.createUser({
-        ...validatedData,
-        password: hashedPassword,
-      });
+      // Tentar criar usuário primeiro no storage, que verificará duplicação
+      // e criará o usuário tanto no Auth quanto na tabela users
+      try {
+        // Remover o campo confirmPassword antes de criar o usuário
+        const { confirmPassword, ...userData } = validatedData;
+        
+        // Criar usuário usando o storage que agora usa Supabase
+        const user = await storage.createUser(userData);
+        console.log(`Usuário criado com sucesso: ${user.email}`);
 
-      // If registering as a photographer, create empty profile
-      if (validatedData.userType === "photographer") {
-        await storage.createPhotographerProfile({
-          userId: user.id,
-          specialties: [],
-          portfolioImages: [],
-          availableTimes: {},
-        });
-      }
-
-      // Login the user automatically after registration
-      req.login(user, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Error during login after registration" });
+        // Se registrando como fotógrafo, criar perfil vazio
+        if (validatedData.userType === "photographer") {
+          await storage.createPhotographerProfile({
+            userId: user.id,
+            specialties: [],
+            portfolioImages: [],
+            availableTimes: {},
+          });
+          console.log(`Perfil de fotógrafo criado para: ${user.email}`);
         }
-        return res.status(201).json({ user: { ...user, password: undefined } });
-      });
-    } catch (error) {
+
+        // Obter token de autenticação do Supabase
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: validatedData.email,
+          password: validatedData.password,
+        });
+
+        if (authError) {
+          console.error("Erro ao fazer login após registro:", authError);
+          
+          // Se o erro for email não confirmado, retornar sucesso mesmo assim
+          if (authError.name === 'AuthApiError' && authError.message === 'Email not confirmed') {
+            // Ainda é considerado sucesso, apenas sem token de sessão
+            return res.status(201).json({ 
+              user: { ...user, password: undefined },
+              message: "Verification email has been sent. Please check your email to confirm your account."
+            });
+          }
+          
+          // Para outros erros, retornar sucesso mesmo assim, mas sem sessão
+          return res.status(201).json({ 
+            user: { ...user, password: undefined },
+            message: "Account created but session could not be established. Please try logging in."
+          });
+        }
+
+        return res.status(201).json({ 
+          user: { ...user, password: undefined },
+          session: authData.session
+        });
+      } catch (storageError: any) {
+        console.error("Erro no armazenamento durante registro:", storageError);
+        
+        // Se o erro for relacionado ao email já em uso
+        if (storageError.message && (
+            storageError.message.includes("duplicate key") || 
+            storageError.message.includes("email") || 
+            storageError.message.includes("Email already in use") ||
+            storageError.message.includes("User already registered"))) {
+          return res.status(400).json({ message: "Email already in use" });
+        }
+        
+        throw storageError; // Re-throw para ser capturado pelo catch externo
+      }
+    } catch (error: any) {
       if (error instanceof ZodError) {
         return res.status(400).json({ message: fromZodError(error).message });
       }
+      
+      // Verificar se é um erro de autenticação do Supabase
+      if (error.status === 400 && error.message && error.message.includes("User already registered")) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+      
       console.error("Registration error:", error);
-      res.status(500).json({ message: "Server error during registration" });
+      res.status(500).json({ message: "Server error during registration", details: error.message });
     }
   });
 
-  app.post("/api/auth/login", (req, res, next) => {
+  app.post("/api/auth/login", async (req, res, next) => {
     try {
-      userLoginSchema.parse(req.body);
+      const validatedData = userLoginSchema.parse(req.body);
       
-      passport.authenticate("local", (err, user, info) => {
-        if (err) {
-          return next(err);
+      console.log(`Tentando login para o email: ${validatedData.email}`);
+      
+      // Autenticar com Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: validatedData.email,
+        password: validatedData.password,
+      });
+
+      if (error) {
+        console.error("Erro de autenticação no Supabase:", error);
+        
+        // Se o erro for de email não confirmado, retornar mensagem específica
+        if (error.message && error.message.includes("Email not confirmed")) {
+          return res.status(401).json({ message: "Email not confirmed. Please check your inbox for the verification email." });
         }
-        if (!user) {
-          return res.status(401).json({ message: info.message });
+        
+        return res.status(401).json({ message: "Incorrect email or password" });
+      }
+
+      // Login no Supabase Auth bem-sucedido
+      console.log(`Login bem-sucedido no Supabase Auth para: ${validatedData.email}`);
+      
+      // Buscar dados do usuário no banco
+      const user = await storage.getUserByEmail(validatedData.email);
+      
+      // Se o usuário não existir na nossa tabela, mas existe no Auth do Supabase
+      if (!user && data.user) {
+        console.log(`Usuário autenticado no Supabase mas não encontrado na tabela users: ${validatedData.email}`);
+        
+        // Criar o usuário na tabela users usando os dados do Auth
+        try {
+          const newUser = await storage.createUser({
+            email: data.user.email || validatedData.email,
+            password: validatedData.password, // Não é realmente usado para autenticação
+            name: data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'Usuário',
+            userType: data.user.user_metadata?.user_type || 'client',
+          });
+          
+          console.log(`Usuário criado na tabela users: ${newUser.email}`);
+          
+          return res.json({ 
+            user: { ...newUser, password: undefined },
+            session: data.session
+          });
+        } catch (createError) {
+          console.error("Erro ao criar usuário na tabela:", createError);
+          // Prosseguir mesmo com erro, retornando apenas dados do Auth
+          return res.json({ 
+            user: { 
+              email: data.user.email,
+              name: data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'Usuário',
+              userType: data.user.user_metadata?.user_type || 'client',
+            },
+            session: data.session
+          });
         }
-        req.login(user, (err) => {
-          if (err) {
-            return next(err);
-          }
-          return res.json({ user: { ...user, password: undefined } });
-        });
-      })(req, res, next);
+      }
+      
+      if (!user) {
+        console.error(`Usuário não encontrado após autenticação: ${validatedData.email}`);
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      console.log(`Login completo para: ${user.email}`);
+      return res.json({ 
+        user: { ...user, password: undefined },
+        session: data.session
+      });
     } catch (error) {
+      console.error("Erro inesperado durante login:", error);
       if (error instanceof ZodError) {
         return res.status(400).json({ message: fromZodError(error).message });
       }
@@ -147,21 +238,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/logout", (req, res) => {
-    req.logout((err) => {
-      if (err) {
+  app.post("/api/auth/logout", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(200).json({ message: "Logged out successfully" });
+    }
+
+    try {
+      // Fazer logout no Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) {
         return res.status(500).json({ message: "Error during logout" });
       }
       res.status(200).json({ message: "Logged out successfully" });
-    });
+    } catch (error) {
+      console.error('Logout error:', error);
+      res.status(500).json({ message: "Error during logout" });
+    }
   });
 
-  app.get("/api/auth/session", (req, res) => {
-    if (req.isAuthenticated()) {
-      const user = req.user as any;
-      return res.json({ user: { ...user, password: undefined } });
+  app.get("/api/auth/session", async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // Retornar null em vez de erro 401
+      return res.json({ user: null });
     }
-    res.status(401).json({ message: "Not authenticated" });
+
+    const token = authHeader.split(' ')[1];
+    
+    try {
+      // Verificar o token com o Supabase
+      const { data, error } = await supabase.auth.getUser(token);
+      
+      if (error || !data.user) {
+        // Retornar null em vez de erro 401
+        return res.json({ user: null });
+      }
+      
+      // Buscar o usuário no banco de dados
+      const user = await storage.getUserByEmail(data.user.email || '');
+      if (!user) {
+        // Retornar null em vez de erro 401
+        return res.json({ user: null });
+      }
+      
+      return res.json({ user: { ...user, password: undefined } });
+    } catch (error) {
+      console.error('Session check error:', error);
+      // Retornar null em vez de erro 401
+      return res.json({ user: null });
+    }
   });
 
   // User routes
@@ -191,15 +317,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/photographers/profile", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
+      console.log('Requisição para perfil de fotógrafo recebida. Usuário:', user?.id, user?.email, user?.userType);
+      
       if (user.userType !== "photographer") {
+        console.log('Acesso negado: usuário não é fotógrafo:', user.userType);
         return res.status(403).json({ message: "Only photographers can access this endpoint" });
       }
       
       const profile = await storage.getPhotographerProfile(user.id);
+      console.log('Perfil de fotógrafo encontrado:', profile ? 'Sim' : 'Não');
+      
       if (!profile) {
+        console.log('Perfil de fotógrafo não encontrado para usuário:', user.id);
         return res.status(404).json({ message: "Photographer profile not found" });
       }
       
+      console.log('Enviando dados do perfil:', profile);
       res.json(profile);
     } catch (error) {
       console.error("Error fetching photographer profile:", error);
@@ -210,16 +343,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/photographers/profile", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
+      console.log('Requisição de atualização de perfil recebida. Usuário:', user?.id, user?.email, user?.userType);
+      console.log('Dados recebidos:', req.body);
+      
       if (user.userType !== "photographer") {
+        console.log('Acesso negado: usuário não é fotógrafo:', user.userType);
         return res.status(403).json({ message: "Only photographers can access this endpoint" });
       }
       
       const validatedData = insertPhotographerProfileSchema.partial().parse(req.body);
+      console.log('Dados validados:', validatedData);
       
       // Check if profile exists
       const existingProfile = await storage.getPhotographerProfile(user.id);
+      console.log('Perfil existente encontrado:', existingProfile ? 'Sim' : 'Não');
+      
       if (!existingProfile) {
         // Create profile if it doesn't exist
+        console.log('Criando novo perfil para usuário:', user.id);
         const newProfile = await storage.createPhotographerProfile({
           userId: user.id,
           ...validatedData,
@@ -227,14 +368,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           portfolioImages: validatedData.portfolioImages || [],
           availableTimes: validatedData.availableTimes || {},
         });
+        console.log('Novo perfil criado:', newProfile);
         return res.json(newProfile);
       }
       
       // Update existing profile
+      console.log('Atualizando perfil existente para usuário:', user.id);
       const updatedProfile = await storage.updatePhotographerProfile(user.id, validatedData);
+      console.log('Perfil atualizado:', updatedProfile);
       res.json(updatedProfile);
     } catch (error) {
       if (error instanceof ZodError) {
+        console.error('Erro de validação:', fromZodError(error).message);
         return res.status(400).json({ message: fromZodError(error).message });
       }
       console.error("Error updating photographer profile:", error);
@@ -649,6 +794,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error searching photographers:", error);
       res.status(500).json({ message: "Error searching photographers" });
+    }
+  });
+
+  // Rota de teste para limpar completamente um usuário específico (apenas para ambiente de desenvolvimento)
+  app.delete("/api/auth/test/cleanup-email", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: "Not allowed in production" });
+      }
+      
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      console.log(`Tentando limpar dados do usuário: ${email}`);
+      
+      // 1. Verificar se o usuário existe na API Auth do Supabase
+      const { data: userData, error: userError } = await supabase.auth.admin.listUsers();
+      
+      if (!userError && userData) {
+        // Encontrar o usuário pelo email
+        const authUser = userData.users.find(u => u.email === email);
+        
+        if (authUser) {
+          console.log(`Usuário encontrado no Auth do Supabase: ${authUser.id}`);
+          
+          // Remover o usuário da autenticação
+          const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(
+            authUser.id
+          );
+          
+          if (deleteAuthError) {
+            console.error("Erro ao remover usuário da Auth:", deleteAuthError);
+          } else {
+            console.log(`Usuário removido do Auth do Supabase: ${email}`);
+          }
+        } else {
+          console.log(`Usuário não encontrado no Auth do Supabase: ${email}`);
+        }
+      }
+      
+      // 2. Remover da tabela users do Supabase
+      const { error: dbError } = await supabase
+        .from('users')
+        .delete()
+        .eq('email', email);
+        
+      if (dbError) {
+        console.error("Erro ao remover usuário da tabela:", dbError);
+      } else {
+        console.log(`Usuário removido da tabela users: ${email}`);
+      }
+      
+      res.json({ message: `Limpeza completa para ${email} concluída` });
+    } catch (error) {
+      console.error("Erro ao limpar usuário:", error);
+      res.status(500).json({ message: "Error during cleanup" });
+    }
+  });
+
+  // Rota para confirmar email manualmente (útil para desenvolvimento)
+  app.post("/api/auth/confirm-email", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: "Not allowed in production" });
+      }
+      
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      // Buscar usuário no Supabase Auth
+      const { data, error } = await supabase.auth.admin.listUsers();
+      
+      if (error) {
+        console.error("Erro ao listar usuários:", error);
+        return res.status(500).json({ message: "Error listing users" });
+      }
+      
+      // Encontrar o usuário pelo email
+      const user = data.users.find(u => u.email === email);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (user.email_confirmed_at) {
+        return res.json({ message: "Email already confirmed" });
+      }
+      
+      // Atualizar o usuário para confirmar o email
+      const { error: updateError } = await supabase.auth.admin.updateUserById(
+        user.id,
+        { email_confirm: true }
+      );
+      
+      if (updateError) {
+        console.error("Erro ao confirmar email:", updateError);
+        return res.status(500).json({ message: "Error confirming email" });
+      }
+      
+      return res.json({ message: "Email confirmed successfully" });
+    } catch (error) {
+      console.error("Error confirming email:", error);
+      res.status(500).json({ message: "Server error during email confirmation" });
+    }
+  });
+
+  // Rota para testar autenticação direta no Supabase Auth (apenas para diagnóstico)
+  app.post("/api/auth/test-auth", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: "Not allowed in production" });
+      }
+      
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+      
+      console.log(`Testando autenticação direta para: ${email}`);
+      
+      // Tentar autenticar diretamente com o Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) {
+        console.error("Erro na autenticação direta:", error);
+        return res.status(401).json({ 
+          success: false, 
+          message: "Authentication failed", 
+          error: error.message 
+        });
+      }
+      
+      // Verificar se existe na tabela users
+      const user = await storage.getUserByEmail(email);
+      
+      return res.json({
+        success: true,
+        auth: {
+          id: data.user?.id,
+          email: data.user?.email,
+          metadata: data.user?.user_metadata,
+          emailConfirmed: !!data.user?.email_confirmed_at,
+        },
+        dbUser: user ? { exists: true, id: user.id, userType: user.userType } : { exists: false }
+      });
+    } catch (error: any) {
+      console.error("Erro ao testar autenticação:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error testing authentication",
+        error: error.message
+      });
     }
   });
 
