@@ -4,3 +4,8 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+.cursor/rules/best-practice.mdc
+.cursor/rules/security.mdc
+.env
+security-checklist.cursorrules
+README.md
