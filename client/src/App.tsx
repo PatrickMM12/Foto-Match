@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -24,21 +24,41 @@ import Footer from "@/components/layout/footer";
 import LoadingSpinner from "@/components/shared/loading-spinner";
 
 function App() {
+  const [location, setLocation] = useLocation();
+
   // Check if user is logged in on app load
   const { data: session, isLoading } = useQuery({
     queryKey: ["/api/auth/session"],
     queryFn: async () => {
       try {
+        // Obter o token do localStorage
+        const token = localStorage.getItem('authToken');
+        console.log('Token obtido do localStorage:', token ? 'Presente' : 'Ausente');
+        
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         const res = await fetch("/api/auth/session", {
+          headers,
           credentials: "include"
         });
+        
+        console.log('Resposta da verificação de sessão:', res.status, res.statusText);
+        
         if (!res.ok) {
           if (res.status === 401) {
+            // Se o token for inválido, remover do localStorage
+            localStorage.removeItem('authToken');
+            console.log('Token removido por ser inválido');
             return { user: null };
           }
           throw new Error("Failed to fetch session");
         }
-        return res.json();
+        const data = await res.json();
+        console.log('Dados de sessão obtidos:', data.user ? 'Usuário autenticado' : 'Sem usuário');
+        return data;
       } catch (error) {
         console.error("Session fetch error:", error);
         return { user: null };
@@ -48,6 +68,28 @@ function App() {
   });
 
   const user = session?.user;
+
+  // Log para debug
+  useEffect(() => {
+    if (user) {
+      console.log('Usuário autenticado:', user.name, user.userType);
+    } else {
+      console.log('Nenhum usuário autenticado');
+    }
+  }, [user]);
+
+  // Redirecionar para login quando o usuário tentar acessar páginas protegidas sem estar autenticado
+  useEffect(() => {
+    if (!isLoading && !user) {
+      if (
+        location.startsWith('/photographer/') ||
+        location.startsWith('/client/')
+      ) {
+        console.log('Tentativa de acesso a rota protegida sem autenticação, redirecionando para login');
+        setLocation('/login');
+      }
+    }
+  }, [location, user, isLoading, setLocation]);
 
   // Determine if showing auth pages or app pages
   const isLoggedIn = !!user;

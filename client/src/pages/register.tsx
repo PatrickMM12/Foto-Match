@@ -55,23 +55,62 @@ const Register = () => {
       }
     },
     onSuccess: (data) => {
+      // Verifica se recebemos uma mensagem sobre email de verificação
+      if (data.message && data.message.includes("Verification email")) {
+        toast({
+          title: 'Conta criada com sucesso!',
+          description: 'Um email de verificação foi enviado para o seu endereço de email. Por favor, verifique sua caixa de entrada (e pasta de spam) para confirmar seu cadastro antes de fazer login.',
+          duration: 8000,
+        });
+        
+        // Redirecionar para a página de login após pequeno atraso
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 300);
+        return;
+      }
+      
+      // Salva o token de autenticação se disponível
+      if (data.session && data.session.access_token) {
+        localStorage.setItem('authToken', data.session.access_token);
+        console.log('Token de autenticação salvo após registro:', data.session.access_token.substring(0, 10) + '...');
+      } else {
+        console.warn('Nenhum token de acesso disponível após registro');
+      }
+      
       toast({
         title: 'Conta criada com sucesso!',
         description: `Bem-vindo à FotoConnect, ${data.user.name}!`,
       });
       
       // Redirect based on user type
-      if (data.user.userType === 'photographer') {
-        navigate('/photographer/dashboard');
-      } else {
-        navigate('/client/search');
-      }
+      const destination = data.user.userType === 'photographer'
+        ? '/photographer/dashboard'
+        : '/client/search';
+        
+      console.log(`Redirecionando para: ${destination}`);
+      
+      // Adicionar um pequeno atraso para garantir que o toast seja exibido
+      setTimeout(() => {
+        window.location.href = destination;
+      }, 300);
     },
     onError: (error: any) => {
+      let errorMessage = 'Verifique seus dados e tente novamente.';
+      
+      if (error.message) {
+        if (error.message.includes("Email already in use")) {
+          errorMessage = 'Este email já está cadastrado. Tente fazer login ou recuperar sua senha.';
+        } else if (error.message.includes("not confirmed")) {
+          errorMessage = 'Email não confirmado. Verifique sua caixa de entrada para o link de confirmação.';
+        }
+      }
+      
       toast({
         title: 'Erro ao criar conta',
-        description: error.message || 'Verifique seus dados e tente novamente.',
+        description: errorMessage,
         variant: 'destructive',
+        duration: 5000,
       });
     },
   });

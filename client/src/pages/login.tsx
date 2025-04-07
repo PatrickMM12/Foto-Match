@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Link } from 'wouter';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { InfoCircledIcon } from '@radix-ui/react-icons';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -23,6 +25,9 @@ const Login = () => {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [emailConfirmNeeded, setEmailConfirmNeeded] = useState(false);
+  const [emailToConfirm, setEmailToConfirm] = useState('');
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -31,6 +36,48 @@ const Login = () => {
       password: '',
     },
   });
+
+  const confirmEmail = () => {
+    if (!emailToConfirm) return;
+    
+    setConfirmLoading(true);
+    fetch('/api/auth/confirm-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: emailToConfirm }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        setConfirmLoading(false);
+        if (data.message === "Email confirmed successfully") {
+          toast({
+            title: 'Email confirmado',
+            description: 'Seu email foi confirmado manualmente. Tente fazer login novamente.',
+            duration: 5000,
+          });
+          setEmailConfirmNeeded(false);
+        } else {
+          toast({
+            title: 'Erro ao confirmar email',
+            description: data.message || 'Não foi possível confirmar seu email.',
+            variant: 'destructive',
+            duration: 5000,
+          });
+        }
+      })
+      .catch(err => {
+        setConfirmLoading(false);
+        console.error('Erro ao confirmar email:', err);
+        toast({
+          title: 'Erro ao confirmar email',
+          description: 'Ocorreu um erro ao tentar confirmar seu email.',
+          variant: 'destructive',
+          duration: 5000,
+        });
+      });
+  };
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginFormValues) => {
@@ -43,23 +90,59 @@ const Login = () => {
       }
     },
     onSuccess: (data) => {
+      setEmailConfirmNeeded(false);
+      
+      // Salvar o token de autenticação
+      if (data.session && data.session.access_token) {
+        localStorage.setItem('authToken', data.session.access_token);
+        console.log('Token de autenticação salvo:', data.session.access_token.substring(0, 10) + '...');
+      } else {
+        console.error('Erro: Token de autenticação não disponível na resposta');
+      }
+      
       toast({
         title: 'Login realizado com sucesso!',
         description: `Bem-vindo de volta, ${data.user.name}!`,
       });
       
-      // Redirect based on user type
-      if (data.user.userType === 'photographer') {
-        navigate('/photographer/dashboard');
-      } else {
-        navigate('/client/search');
-      }
+      // Redirect based on user type - usando window.location diretamente
+      const destination = data.user.userType === 'photographer' 
+        ? '/photographer/dashboard' 
+        : '/client/search';
+        
+      console.log(`Redirecionando para: ${destination}`);
+      
+      // Adicionar um pequeno atraso para garantir que o toast seja exibido
+      setTimeout(() => {
+        window.location.href = destination;
+      }, 300);
     },
     onError: (error: any) => {
+      let errorMessage = 'Verifique suas credenciais e tente novamente.';
+      let title = 'Erro ao fazer login';
+      
+      if (error.message) {
+        if (error.message.includes("Incorrect email or password")) {
+          errorMessage = 'Email ou senha incorretos. Verifique seus dados e tente novamente.';
+          setEmailConfirmNeeded(false);
+        } else if (error.message.includes("not confirmed") || error.message.includes("Email not confirmed")) {
+          title = 'Email não confirmado';
+          errorMessage = 'Você precisa confirmar seu email antes de fazer login. Verifique sua caixa de entrada.';
+          setEmailToConfirm(form.getValues('email'));
+          setEmailConfirmNeeded(true);
+        } else if (error.message.includes("User not found")) {
+          errorMessage = 'Usuário não encontrado. Verifique se você digitou o email corretamente ou crie uma nova conta.';
+          setEmailConfirmNeeded(false);
+        } else {
+          setEmailConfirmNeeded(false);
+        }
+      }
+      
       toast({
-        title: 'Erro ao fazer login',
-        description: error.message || 'Verifique suas credenciais e tente novamente.',
+        title: title,
+        description: errorMessage,
         variant: 'destructive',
+        duration: 6000,
       });
     },
   });
@@ -78,6 +161,24 @@ const Login = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {emailConfirmNeeded && (
+            <Alert className="mb-4 bg-amber-50 border-amber-200">
+              <InfoCircledIcon className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-sm text-amber-800">
+                Seu email não foi confirmado. Verifique sua caixa de entrada ou clique abaixo para confirmar manualmente.
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2 w-full border-amber-300 hover:bg-amber-100"
+                  onClick={confirmEmail}
+                  disabled={confirmLoading}
+                >
+                  {confirmLoading ? 'Confirmando...' : 'Confirmar Email Manualmente'}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField

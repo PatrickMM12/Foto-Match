@@ -25,11 +25,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     queryKey: ['/api/auth/session'],
     queryFn: async () => {
       try {
+        // Obter o token do localStorage
+        const token = localStorage.getItem('authToken');
+        
+        // Se não houver token, retornar usuário nulo
+        if (!token) {
+          return { user: null };
+        }
+        
+        // Enviar o token no cabeçalho da requisição
         const res = await fetch('/api/auth/session', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
           credentials: 'include'
         });
+        
         if (!res.ok) {
           if (res.status === 401) {
+            // Se o token for inválido, remover do localStorage
+            localStorage.removeItem('authToken');
             return { user: null };
           }
           throw new Error('Failed to fetch session');
@@ -53,6 +68,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return res.json();
     },
     onSuccess: (data) => {
+      // Salvar o token no localStorage
+      if (data.session && data.session.access_token) {
+        localStorage.setItem('authToken', data.session.access_token);
+      }
+      
       queryClient.setQueryData(['/api/auth/session'], { user: data.user });
       queryClient.invalidateQueries({ queryKey: ['/api/auth/session'] });
       
@@ -84,6 +104,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return res.json();
     },
     onSuccess: (data) => {
+      // Salvar o token no localStorage
+      if (data.session && data.session.access_token) {
+        localStorage.setItem('authToken', data.session.access_token);
+      }
+      
       queryClient.setQueryData(['/api/auth/session'], { user: data.user });
       queryClient.invalidateQueries({ queryKey: ['/api/auth/session'] });
       
@@ -111,9 +136,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      // Obter o token do localStorage
+      const token = localStorage.getItem('authToken');
+      
+      if (token) {
+        // Enviar o token no cabeçalho da requisição
+        const response = await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        });
+        return response;
+      }
       return await apiRequest('POST', '/api/auth/logout', {});
     },
     onSuccess: () => {
+      // Remover o token do localStorage
+      localStorage.removeItem('authToken');
+      
       queryClient.setQueryData(['/api/auth/session'], { user: null });
       queryClient.invalidateQueries({ queryKey: ['/api/auth/session'] });
       
