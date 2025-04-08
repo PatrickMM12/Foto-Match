@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useMutation } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
 import { Button } from '@/components/ui/button';
@@ -18,6 +17,9 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Verificar se estamos na landing page
+  const isLandingPage = location === "/";
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -81,6 +83,18 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  // Função para rolar para a seção quando clicar no link
+  const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
+    e.preventDefault();
+    const section = document.getElementById(sectionId);
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      // Se não encontrar a seção na página atual, navegar para a landing page com o hash
+      window.location.href = `/#${sectionId}`;
+    }
+  };
+
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 flex justify-between items-center h-16">
@@ -90,20 +104,31 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
         </Link>
 
         <div className="flex items-center space-x-4 sm:space-x-6">
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link href="/" className={`transition-colors ${isActive('/') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
-              Início
-            </Link>
-            <Link href="/#how-it-works" className={`transition-colors ${isActive('/#how-it-works') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
-              Como Funciona
-            </Link>
-            <Link href="/#features" className={`transition-colors ${isActive('/#features') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
-              Recursos
-            </Link>
-            <Link href="/#pricing" className={`transition-colors ${isActive('/#pricing') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
-              Preços
-            </Link>
-          </nav>
+          {/* Menu de navegação desktop - mostrar apenas na landing page */}
+          {isLandingPage && (
+            <nav className="hidden md:flex items-center space-x-6">
+              <a href="#home" 
+                onClick={(e) => scrollToSection(e, 'home')} 
+                className={`transition-colors ${isActive('/#home') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
+                Início
+              </a>
+              <a href="#features" 
+                onClick={(e) => scrollToSection(e, 'features')} 
+                className={`transition-colors ${isActive('/#features') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
+                Recursos
+              </a>
+              <a href="#how-it-works" 
+                onClick={(e) => scrollToSection(e, 'how-it-works')} 
+                className={`transition-colors ${isActive('/#how-it-works') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
+                Como Funciona
+              </a>
+              <a href="#pricing" 
+                onClick={(e) => scrollToSection(e, 'pricing')} 
+                className={`transition-colors ${isActive('/#pricing') ? 'text-primary font-medium' : 'text-gray-600 hover:text-primary'}`}>
+                Preços
+              </a>
+            </nav>
+          )}
 
           {user ? (
             <div className="flex items-center space-x-3">
@@ -290,18 +315,35 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
                   </>
                 ) : (
                   <>
-                    <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="py-2 font-medium">
-                      Início
-                    </Link>
-                    <Link href="/#how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="py-2 font-medium">
-                      Como Funciona
-                    </Link>
-                    <Link href="/#features" onClick={() => setIsMobileMenuOpen(false)} className="py-2 font-medium">
-                      Recursos
-                    </Link>
-                    <Link href="/#pricing" onClick={() => setIsMobileMenuOpen(false)} className="py-2 font-medium">
-                      Preços
-                    </Link>
+                    {/* Links da landing page no menu mobile - apenas mostrar na landing page */}
+                    {isLandingPage && (
+                      <>
+                        <a href="#home" onClick={(e) => {
+                          scrollToSection(e, 'home');
+                          setIsMobileMenuOpen(false);
+                        }} className="py-2 font-medium">
+                          Início
+                        </a>
+                        <a href="#how-it-works" onClick={(e) => {
+                          scrollToSection(e, 'how-it-works');
+                          setIsMobileMenuOpen(false);
+                        }} className="py-2 font-medium">
+                          Como Funciona
+                        </a>
+                        <a href="#features" onClick={(e) => {
+                          scrollToSection(e, 'features');
+                          setIsMobileMenuOpen(false);
+                        }} className="py-2 font-medium">
+                          Recursos
+                        </a>
+                        <a href="#pricing" onClick={(e) => {
+                          scrollToSection(e, 'pricing');
+                          setIsMobileMenuOpen(false);
+                        }} className="py-2 font-medium">
+                          Preços
+                        </a>
+                      </>
+                    )}
                     <div className="border-t pt-4 mt-4 flex flex-col space-y-2">
                       <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                         <Button variant="outline" className="w-full">Entrar</Button>
