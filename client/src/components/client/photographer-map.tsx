@@ -1,9 +1,10 @@
-import { useRef, useEffect, useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Star } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface PhotographerMapProps {
   center: { lat: number | null; lng: number | null };
@@ -18,12 +19,42 @@ const PhotographerMap: React.FC<PhotographerMapProps> = ({
 }) => {
   const [selectedPhotographer, setSelectedPhotographer] = useState<any | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const { toast } = useToast();
+  const [mapError, setMapError] = useState<string | null>(null);
   
-  // Load Google Maps API
-  const { isLoaded } = useJsApiLoader({
+  // Get API key from environment (usando o padrão do Vite para variáveis de ambiente)
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+  
+  // Fallback para um valor estático se a variável de ambiente não estiver disponível
+  const fallbackApiKey = 'AIzaSyD26qsgGUZ3IasPhI4S2HNXTQi6oQ_RMRo';
+  
+  // Use o apiKey se estiver disponível, senão use o fallback
+  const googleMapsApiKey = apiKey || fallbackApiKey;
+  
+  // Load Google Maps API com tratamento de erro
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
+    googleMapsApiKey: googleMapsApiKey
   });
+
+  // Tratar erros de carregamento do mapa
+  useEffect(() => {
+    if (loadError) {
+      console.error('Erro ao carregar Google Maps API:', loadError);
+      
+      // Verificar se é o erro específico de ApiTargetBlockedMapError
+      if (loadError.toString().includes('ApiTargetBlockedMapError')) {
+        setMapError('A API do Google Maps está bloqueada. Verifique as restrições da chave da API no Console do Google Cloud.');
+        toast({
+          title: "Erro no carregamento do mapa",
+          description: "A API do Google Maps está bloqueada. Por favor, tente novamente mais tarde.",
+          variant: "destructive"
+        });
+      } else {
+        setMapError('Erro ao carregar o mapa. Por favor, tente novamente mais tarde.');
+      }
+    }
+  }, [loadError, toast]);
 
   // Map options
   const mapOptions = {
@@ -109,6 +140,15 @@ const PhotographerMap: React.FC<PhotographerMapProps> = ({
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  if (loadError || mapError) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-4">
+        <p className="text-red-500 font-medium mb-2">Erro ao carregar o mapa</p>
+        <p className="text-sm text-center text-muted-foreground">{mapError || 'Ocorreu um erro ao carregar o mapa. Por favor, tente novamente mais tarde.'}</p>
+      </div>
+    );
+  }
+
   if (!isLoaded) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -120,7 +160,7 @@ const PhotographerMap: React.FC<PhotographerMapProps> = ({
   return (
     <GoogleMap
       mapContainerStyle={{ width: '100%', height: '100%' }}
-      center={center.lat && center.lng ? center : { lat: -23.5505, lng: -46.6333 }}
+      center={center.lat && center.lng ? { lat: center.lat, lng: center.lng } : { lat: -23.5505, lng: -46.6333 }}
       zoom={10}
       onLoad={onMapLoad}
       onUnmount={onUnmount}

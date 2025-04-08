@@ -171,13 +171,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (error) {
         console.error("Erro de autenticação no Supabase:", error);
+        console.error("Detalhes do erro:", JSON.stringify(error, null, 2));
         
-        // Se o erro for de email não confirmado, retornar mensagem específica
-        if (error.message && error.message.includes("Email not confirmed")) {
-          return res.status(401).json({ message: "Email not confirmed. Please check your inbox for the verification email." });
+        // Mensagens de erro mais específicas
+        if (error.message) {
+          // Verificar diferentes tipos de erro
+          if (error.message.includes("Email not confirmed") || 
+              error.message.includes("not confirmed") ||
+              error.message.toLowerCase().includes("email confirmation")) {
+            console.log(`Identificado erro de email não confirmado para: ${validatedData.email}`);
+            return res.status(401).json({ 
+              message: "Email not confirmed. Please check your inbox for the verification email.",
+              errorCode: "EMAIL_NOT_CONFIRMED",
+              email: validatedData.email
+            });
+          } else if (error.message.includes("Invalid login credentials") ||
+                    error.message.includes("Incorrect email or password")) {
+            console.log(`Credenciais inválidas para: ${validatedData.email}`);
+            return res.status(401).json({ 
+              message: "Incorrect email or password", 
+              errorCode: "INVALID_CREDENTIALS"
+            });
+          } else if (error.message.includes("User not found") ||
+                    error.message.includes("user not found")) {
+            console.log(`Usuário não encontrado: ${validatedData.email}`);
+            return res.status(401).json({ 
+              message: "User not found", 
+              errorCode: "USER_NOT_FOUND"
+            });
+          }
         }
         
-        return res.status(401).json({ message: "Incorrect email or password" });
+        // Para garantir que outros erros também sejam capturados
+        console.log(`Erro genérico de autenticação para: ${validatedData.email}`);
+        return res.status(401).json({ 
+          message: error.message || "Authentication failed", 
+          errorCode: "AUTH_FAILED",
+          details: error
+        });
       }
 
       // Login no Supabase Auth bem-sucedido
@@ -235,6 +266,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: fromZodError(error).message });
       }
       next(error);
+    }
+  });
+
+  // Rota para confirmação manual de email (apenas para desenvolvimento/testes)
+  app.post("/api/auth/confirm-email", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        console.log("Tentativa de confirmação de email sem fornecer o email");
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      console.log(`Confirmando manualmente o email: ${email}`);
+      
+      // Verificar se o usuário existe no banco de dados primeiro
+      const dbUser = await storage.getUserByEmail(email);
+      
+      if (!dbUser) {
+        console.log(`Usuário não encontrado no banco de dados: ${email}`);
+        return res.status(404).json({ message: "User not found in database" });
+      }
+      
+      console.log(`Usuário encontrado no banco de dados: ${email}, ID: ${dbUser.id}`);
+      
+      // Buscar usuário no Auth do Supabase
+      const { data: userData, error: userError } = await supabase.auth.admin.listUsers();
+      
+      if (userError) {
+        console.error("Erro ao listar usuários no Supabase:", userError);
+        return res.status(500).json({ message: "Error checking user in Auth system" });
+      }
+      
+      const supabaseUser = userData.users.find(user => user.email?.toLowerCase() === email.toLowerCase());
+      
+      if (!supabaseUser) {
+        console.error(`Usuário não encontrado no Supabase Auth: ${email}`);
+        return res.status(404).json({ message: "User not found in authentication system" });
+      }
+      
+      console.log(`Usuário encontrado no Supabase Auth: ${email}, ID: ${supabaseUser.id}`);
+      
+      // Verificar se o email já está confirmado
+      if (supabaseUser.email_confirmed_at) {
+        console.log(`Email já está confirmado: ${email}, confirmado em: ${supabaseUser.email_confirmed_at}`);
+        return res.status(200).json({ message: "Email already confirmed" });
+      }
+      
+      // Atualizar o status do email para confirmado
+      const { error: updateError } = await supabase.auth.admin.updateUserById(
+        supabaseUser.id,
+        { email_confirm: true }
+      );
+      
+      if (updateError) {
+        console.error("Erro ao confirmar email:", updateError);
+        return res.status(500).json({ message: "Failed to confirm email", error: updateError.message });
+      }
+      
+      console.log(`Email confirmado com sucesso: ${email}`);
+      return res.status(200).json({ message: "Email confirmed successfully" });
+    } catch (error: any) {
+      console.error("Erro na confirmação manual de email:", error);
+      res.status(500).json({ 
+        message: "Server error during email confirmation", 
+        details: error.message 
+      });
     }
   });
 
@@ -856,56 +954,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Rota para confirmar email manualmente (útil para desenvolvimento)
-  app.post("/api/auth/confirm-email", async (req, res) => {
-    try {
-      if (process.env.NODE_ENV === 'production') {
-        return res.status(403).json({ message: "Not allowed in production" });
-      }
-      
-      const { email } = req.body;
-      
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
-      
-      // Buscar usuário no Supabase Auth
-      const { data, error } = await supabase.auth.admin.listUsers();
-      
-      if (error) {
-        console.error("Erro ao listar usuários:", error);
-        return res.status(500).json({ message: "Error listing users" });
-      }
-      
-      // Encontrar o usuário pelo email
-      const user = data.users.find(u => u.email === email);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      if (user.email_confirmed_at) {
-        return res.json({ message: "Email already confirmed" });
-      }
-      
-      // Atualizar o usuário para confirmar o email
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
-        user.id,
-        { email_confirm: true }
-      );
-      
-      if (updateError) {
-        console.error("Erro ao confirmar email:", updateError);
-        return res.status(500).json({ message: "Error confirming email" });
-      }
-      
-      return res.json({ message: "Email confirmed successfully" });
-    } catch (error) {
-      console.error("Error confirming email:", error);
-      res.status(500).json({ message: "Server error during email confirmation" });
-    }
-  });
-
   // Rota para testar autenticação direta no Supabase Auth (apenas para diagnóstico)
   app.post("/api/auth/test-auth", async (req, res) => {
     try {
@@ -955,6 +1003,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false, 
         message: "Error testing authentication",
         error: error.message
+      });
+    }
+  });
+
+  app.post("/api/auth/resend-verification", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      console.log(`Requisição para reenvio de email de verificação recebida: ${email}`);
+      
+      if (!email) {
+        console.log('Email não fornecido na requisição');
+        return res.status(400).json({ success: false, message: "Email não fornecido" });
+      }
+      
+      // Verificar se o usuário existe no Supabase Auth
+      // Buscar usuário diretamente com a função getUserByEmail (que já existe)
+      console.log(`Procurando usuário no banco de dados: ${email}`);
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        console.log(`Usuário não encontrado: ${email}`);
+        return res.status(404).json({ success: false, message: "Usuário não encontrado" });
+      }
+      
+      console.log(`Usuário encontrado: ${email}, ID: ${user.id}. Reenviando email...`);
+      
+      // Reenviar email de verificação
+      const { data: resendData, error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      });
+      
+      if (resendError) {
+        console.error("Erro ao reenviar email de verificação:", resendError);
+        return res.status(500).json({ 
+          success: false, 
+          message: "Não foi possível enviar o email de verificação",
+          details: resendError.message
+        });
+      }
+      
+      console.log(`Email de verificação reenviado com sucesso para: ${email}`, resendData);
+      return res.status(200).json({ 
+        success: true, 
+        message: "Email de verificação reenviado com sucesso" 
+      });
+    } catch (error: any) {
+      console.error("Erro ao reenviar email de verificação:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Erro ao reenviar email de verificação",
+        details: error.message 
       });
     }
   });

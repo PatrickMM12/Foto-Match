@@ -15,12 +15,19 @@ export const useGoogleMaps = () => {
       return;
     }
 
-    // Get API key from environment
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY || '';
+    // Get API key from environment (usando o padrão do Vite para variáveis de ambiente)
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+    
+    // Fallback para um valor estático se a variável de ambiente não estiver disponível
+    // Isso evita erros em ambiente de desenvolvimento
+    const fallbackApiKey = 'AIzaSyD26qsgGUZ3IasPhI4S2HNXTQi6oQ_RMRo';
+    
+    // Use o apiKey se estiver disponível, senão use o fallback
+    const googleMapsApiKey = apiKey || fallbackApiKey;
 
     // Load the Google Maps API
     const loader = new Loader({
-      apiKey,
+      apiKey: googleMapsApiKey,
       version: 'weekly',
       libraries: ['places', 'geometry']
     });
