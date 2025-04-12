@@ -11,7 +11,42 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Star, MapPin, Camera, Calendar, Clock, Award } from 'lucide-react';
+import { Star, MapPin, Camera, Calendar, Clock, Award, DollarSign } from 'lucide-react';
+
+// Interfaces para tipagem
+interface Service {
+  id: number;
+  userId: number;
+  name: string;
+  description: string | null;
+  price: number; // in cents
+  duration: number; // in minutes
+  maxPhotos: number | null;
+  additionalPhotoPrice: number | null; // in cents
+  active: boolean;
+}
+
+interface Review {
+  id: number;
+  sessionId: number;
+  reviewerId: number;
+  photographerId: number;
+  rating: number;
+  qualityRating: number;
+  professionalismRating: number;
+  comment: string | null;
+  createdAt: string;
+}
+
+interface PortfolioItem {
+  id: number;
+  userId: number;
+  imageUrl: string;
+  title: string | null;
+  category: string | null;
+  featured: boolean;
+  createdAt: string;
+}
 
 const PhotographerDetail = () => {
   const { id } = useParams();
@@ -40,20 +75,62 @@ const PhotographerDetail = () => {
   });
   
   // Fetch portfolio items
-  const { data: portfolioItems, isLoading: isLoadingPortfolio } = useQuery({
+  const { data: portfolioItems = [], isLoading: isLoadingPortfolio } = useQuery<PortfolioItem[]>({
     queryKey: [`/api/portfolio/${id}`],
+    queryFn: async () => {
+      try {
+        const res = await fetch(`/api/portfolio/${id}`, {
+          credentials: 'include'
+        });
+        if (!res.ok) {
+          throw new Error('Failed to fetch portfolio');
+        }
+        return res.json();
+      } catch (error) {
+        console.error('Portfolio fetch error:', error);
+        return [];
+      }
+    },
     enabled: !!id,
   });
   
   // Fetch services
-  const { data: services, isLoading: isLoadingServices } = useQuery({
-    queryKey: [`/api/services/${id}`],
+  const { data: services = [], isLoading: isLoadingServices } = useQuery<Service[]>({
+    queryKey: [`/api/photographers/${id}/services`],
+    queryFn: async () => {
+      try {
+        const res = await fetch(`/api/photographers/${id}/services`, {
+          credentials: 'include'
+        });
+        if (!res.ok) {
+          throw new Error('Failed to fetch services');
+        }
+        return res.json();
+      } catch (error) {
+        console.error('Services fetch error:', error);
+        return [];
+      }
+    },
     enabled: !!id,
   });
   
   // Fetch reviews
-  const { data: reviews, isLoading: isLoadingReviews } = useQuery({
+  const { data: reviews = [], isLoading: isLoadingReviews } = useQuery<Review[]>({
     queryKey: [`/api/reviews/photographer/${id}`],
+    queryFn: async () => {
+      try {
+        const res = await fetch(`/api/reviews/photographer/${id}`, {
+          credentials: 'include'
+        });
+        if (!res.ok) {
+          throw new Error('Failed to fetch reviews');
+        }
+        return res.json();
+      } catch (error) {
+        console.error('Reviews fetch error:', error);
+        return [];
+      }
+    },
     enabled: !!id,
   });
   
@@ -182,7 +259,7 @@ const PhotographerDetail = () => {
                         <div>
                           <h4 className="font-medium">Especialidades</h4>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {photographerProfile.specialties.map((specialty, index) => (
+                            {photographerProfile.specialties.map((specialty: string, index: number) => (
                               <Badge key={index} variant="secondary">{specialty}</Badge>
                             ))}
                           </div>
@@ -277,7 +354,7 @@ const PhotographerDetail = () => {
                                   </div>
                                   <span>{service.maxPhotos || 'Não especificado'}</span>
                                 </div>
-                                {service.additionalPhotoPrice > 0 && (
+                                {service.additionalPhotoPrice !== null && service.additionalPhotoPrice > 0 && (
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center">
                                       <DollarSign className="h-4 w-4 mr-1 text-primary" />

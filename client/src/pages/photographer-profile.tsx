@@ -10,6 +10,7 @@ import PhotographerSidebar from '@/components/layout/photographer-sidebar';
 import PageTitle from '@/components/shared/page-title';
 import AvatarUpload from '@/components/shared/avatar-upload';
 import PortfolioEditor from '@/components/photographer/portfolio-editor';
+import ServiceManager from '@/components/photographer/services-manager';
 import LoadingSpinner from '@/components/shared/loading-spinner';
 
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Definindo tipos para dados da API
 interface UserData {
@@ -335,194 +337,208 @@ const PhotographerProfile = () => {
       <div className="flex-1 p-8">
         <PageTitle title="Perfil do Fotógrafo" />
 
-        <div className="grid md:grid-cols-12 gap-8">
-          <div className="md:col-span-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Informações pessoais</CardTitle>
-                <CardDescription>
-                  Atualize seus dados de perfil e informações profissionais
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nome completo</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Seu nome" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Telefone</FormLabel>
-                            <FormControl>
-                              <Input placeholder="(00) 00000-0000" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+        <Tabs defaultValue="profile" className="w-full">
+          <TabsList className="grid w-full md:w-auto grid-cols-3 mb-6">
+            <TabsTrigger value="profile">Informações</TabsTrigger>
+            <TabsTrigger value="services">Serviços</TabsTrigger>
+            <TabsTrigger value="portfolio">Portfólio</TabsTrigger>
+          </TabsList>
 
-                    <FormField
-                      control={form.control}
-                      name="bio"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Biografia</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Conte um pouco sobre você e sua experiência como fotógrafo"
-                              className="resize-none"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+          <TabsContent value="profile">
+            <div className="grid md:grid-cols-12 gap-8">
+              <div className="md:col-span-8">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Informações pessoais</CardTitle>
+                    <CardDescription>
+                      Atualize seus dados de perfil e informações profissionais
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Nome completo</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Seu nome" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="phone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Telefone</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="(00) 00000-0000" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={form.control}
+                          name="bio"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Biografia</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Conte um pouco sobre você e sua experiência como fotógrafo"
+                                  className="resize-none"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="location"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Localização</FormLabel>
+                              <FormControl>
+                                <Input placeholder="São Paulo, SP" {...field} />
+                              </FormControl>
+                              <FormDescription>
+                                Sua cidade e estado para aparecer nas buscas locais
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="instagramUsername"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Usuário do Instagram</FormLabel>
+                              <FormControl>
+                                <Input placeholder="@seuperfil" {...field} />
+                              </FormControl>
+                              <FormDescription>
+                                Seu perfil profissional no Instagram (sem o @)
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                            control={form.control}
+                            name="yearsOfExperience"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Anos de experiência</FormLabel>
+                                <FormControl>
+                                  <Input type="number" min="0" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={form.control}
+                          name="equipmentDescription"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Equipamentos</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Descreva os equipamentos que você utiliza"
+                                  className="resize-none"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <Button
+                          type="submit"
+                          className="w-full md:w-auto"
+                          disabled={updateProfileMutation.isPending}
+                        >
+                          {updateProfileMutation.isPending ? 'Salvando...' : 'Salvar alterações'}
+                        </Button>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="md:col-span-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Foto de perfil</CardTitle>
+                    <CardDescription>
+                      Sua imagem será exibida no seu perfil e nas buscas
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col items-center">
+                    <AvatarUpload
+                      currentAvatar={data?.avatar}
+                      onUpload={(url) => {
+                        console.log('Atualizando avatar para:', url);
+                        apiRequest('PATCH', '/api/users/me', { avatar: url })
+                          .then(() => {
+                            console.log('Avatar atualizado com sucesso no servidor');
+                            
+                            // Invalidar a consulta
+                            queryClient.invalidateQueries({ queryKey: ['/api/users/me'] });
+                            
+                            // Recarregar os dados do usuário imediatamente sem esperar a invalidação
+                            refetchUser().then(() => {
+                              console.log('Dados do usuário recarregados após atualização do avatar');
+                            });
+                            
+                            toast({
+                              title: 'Foto atualizada',
+                              description: 'Sua foto de perfil foi atualizada com sucesso',
+                            });
+                          })
+                          .catch((error) => {
+                            console.error('Erro ao atualizar avatar:', error);
+                            toast({
+                              title: 'Erro ao atualizar foto',
+                              description: 'Não foi possível atualizar sua foto de perfil',
+                              variant: 'destructive',
+                            });
+                          });
+                      }}
                     />
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
 
-                    <FormField
-                      control={form.control}
-                      name="location"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Localização</FormLabel>
-                          <FormControl>
-                            <Input placeholder="São Paulo, SP" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Sua cidade e estado para aparecer nas buscas locais
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+          <TabsContent value="services">
+            {data && <ServiceManager userId={data.id} />}
+          </TabsContent>
 
-                    <FormField
-                      control={form.control}
-                      name="instagramUsername"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Usuário do Instagram</FormLabel>
-                          <FormControl>
-                            <Input placeholder="@seuperfil" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Seu perfil profissional no Instagram (sem o @)
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField
-                        control={form.control}
-                        name="yearsOfExperience"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Anos de experiência</FormLabel>
-                            <FormControl>
-                              <Input type="number" min="0" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <FormField
-                      control={form.control}
-                      name="equipmentDescription"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Equipamentos</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Descreva os equipamentos que você utiliza"
-                              className="resize-none"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <Button
-                      type="submit"
-                      className="w-full md:w-auto"
-                      disabled={updateProfileMutation.isPending}
-                    >
-                      {updateProfileMutation.isPending ? 'Salvando...' : 'Salvar alterações'}
-                    </Button>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="md:col-span-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Foto de perfil</CardTitle>
-                <CardDescription>
-                  Sua imagem será exibida no seu perfil e nas buscas
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center">
-                <AvatarUpload
-                  currentAvatar={data?.avatar}
-                  onUpload={(url) => {
-                    console.log('Atualizando avatar para:', url);
-                    apiRequest('PATCH', '/api/users/me', { avatar: url })
-                      .then(() => {
-                        console.log('Avatar atualizado com sucesso no servidor');
-                        
-                        // Invalidar a consulta
-                        queryClient.invalidateQueries({ queryKey: ['/api/users/me'] });
-                        
-                        // Recarregar os dados do usuário imediatamente sem esperar a invalidação
-                        refetchUser().then(() => {
-                          console.log('Dados do usuário recarregados após atualização do avatar');
-                        });
-                        
-                        toast({
-                          title: 'Foto atualizada',
-                          description: 'Sua foto de perfil foi atualizada com sucesso',
-                        });
-                      })
-                      .catch((error) => {
-                        console.error('Erro ao atualizar avatar:', error);
-                        toast({
-                          title: 'Erro ao atualizar foto',
-                          description: 'Não foi possível atualizar sua foto de perfil',
-                          variant: 'destructive',
-                        });
-                      });
-                  }}
-                />
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        <div className="mt-8">
-          <PortfolioEditor userId={data?.id} />
-        </div>
+          <TabsContent value="portfolio">
+            <PortfolioEditor userId={data?.id} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
