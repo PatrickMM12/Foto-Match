@@ -2,38 +2,98 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import React from 'react';
 
 import PhotographerSidebar from '@/components/layout/photographer-sidebar';
 import PageTitle from '@/components/shared/page-title';
 import LoadingSpinner from '@/components/shared/loading-spinner';
 import SessionForm from '@/components/photographer/session-form';
+import CreateSessionForm from '@/components/photographer/create-session-form';
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Calendar, MapPin, Clock, DollarSign, User, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, MapPin, Clock, DollarSign, User, CheckCircle, XCircle, Plus } from 'lucide-react';
+
+// Definir a interface da sessão para evitar erros de tipagem
+interface Session {
+  id: number;
+  title: string;
+  description?: string;
+  date: string;
+  duration: number;
+  location: string;
+  status: string;
+  totalPrice: number;
+  photosIncluded: number;
+  photosDelivered: number;
+  additionalPhotos: number;
+  additionalPhotoPrice: number;
+  paymentStatus: string;
+  amountPaid: number;
+  clientId: number;
+  clientName?: string;
+  photographerId: number;
+  serviceId: number;
+  createdAt: string;
+}
 
 const PhotographerSessions = () => {
   const { toast } = useToast();
-  const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("upcoming");
   
-  const { data: sessions, isLoading } = useQuery({
+  const { data: sessions, isLoading, refetch } = useQuery<Session[]>({
     queryKey: ['/api/sessions'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/sessions', undefined);
+      if (!res.ok) {
+        throw new Error('Erro ao buscar sessões');
+      }
+      const data = await res.json();
+      console.log('Dados de sessões recebidos:', data);
+      return data;
+    },
   });
   
   const updateSessionMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: any }) => {
-      return await apiRequest('PATCH', `/api/sessions/${id}`, data);
+      const response = await apiRequest('PATCH', `/api/sessions/${id}`, data);
+      const updatedSession = await response.json();
+      return updatedSession as Session;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+    onSuccess: async (updatedSession: Session) => {
+      // Atualizar a sessão selecionada
+      setSelectedSession(updatedSession);
+      
+      // Buscar novamente os dados do backend para garantir que tudo esteja atualizado
+      await refetch();
+      
+      // Verificar a categoria da sessão atualizada e mudar para a aba apropriada, se necessário
+      const oldStatus = selectedSession?.status;
+      if (oldStatus !== updatedSession.status) {
+        // Se o status mudou, ajustar a aba ativa apropriadamente
+        if (updatedSession.status === 'pending') {
+          setActiveTab('pending');
+        } else if (updatedSession.status === 'confirmed') {
+          const isUpcoming = new Date(updatedSession.date) > new Date();
+          setActiveTab(isUpcoming ? 'upcoming' : 'past');
+        } else if (updatedSession.status === 'completed') {
+          setActiveTab('past');
+        } else if (updatedSession.status === 'canceled') {
+          setActiveTab('canceled');
+        }
+      }
+      
       toast({
         title: 'Sessão atualizada',
         description: 'A sessão foi atualizada com sucesso',
       });
+      
       setIsDialogOpen(false);
     },
     onError: () => {
@@ -45,7 +105,7 @@ const PhotographerSessions = () => {
     }
   });
   
-  const handleViewSession = (session: any) => {
+  const handleViewSession = (session: Session) => {
     setSelectedSession(session);
     setIsDialogOpen(true);
   };
@@ -95,22 +155,45 @@ const PhotographerSessions = () => {
     return `R$ ${(amount / 100).toFixed(2).replace('.', ',')}`;
   };
   
+  // Usamos useMemo para calcular as listas filtradas sempre que sessions mudar
+  const pendingSessions = React.useMemo(() => 
+    sessions?.filter((s: Session) => s.status === 'pending') || [],
+  [sessions]);
+  
+  const upcomingSessions = React.useMemo(() => 
+    sessions?.filter((s: Session) => s.status === 'confirmed' && new Date(s.date) > new Date()) || [],
+  [sessions]);
+  
+  const pastSessions = React.useMemo(() => 
+    sessions?.filter((s: Session) => 
+      s.status === 'completed' || (s.status === 'confirmed' && new Date(s.date) <= new Date())
+    ) || [],
+  [sessions]);
+  
+  const canceledSessions = React.useMemo(() => 
+    sessions?.filter((s: Session) => s.status === 'canceled') || [],
+  [sessions]);
+  
   if (isLoading) {
     return <LoadingSpinner />;
   }
-  
-  const pendingSessions = sessions?.filter(s => s.status === 'pending') || [];
-  const upcomingSessions = sessions?.filter(s => s.status === 'confirmed' && new Date(s.date) > new Date()) || [];
-  const pastSessions = sessions?.filter(s => s.status === 'completed' || (s.status === 'confirmed' && new Date(s.date) <= new Date())) || [];
-  const canceledSessions = sessions?.filter(s => s.status === 'canceled') || [];
   
   return (
     <div className="flex min-h-screen bg-gray-50">
       <PhotographerSidebar />
       <div className="flex-1 p-8">
-        <PageTitle title="Sessões Fotográficas" />
+        <div className="flex justify-between items-center">
+          <PageTitle title="Sessões Fotográficas" />
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)} 
+            className="flex items-center"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Criar Sessão
+          </Button>
+        </div>
         
-        <Tabs defaultValue="upcoming" className="mt-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
           <TabsList className="grid grid-cols-4 mb-6">
             <TabsTrigger value="pending">
               Pendentes ({pendingSessions.length})
@@ -127,7 +210,7 @@ const PhotographerSessions = () => {
           </TabsList>
           
           {(['pending', 'upcoming', 'past', 'canceled'] as const).map(tabValue => {
-            let sessionsToShow;
+            let sessionsToShow: Session[] = [];
             
             switch (tabValue) {
               case 'pending':
@@ -142,8 +225,6 @@ const PhotographerSessions = () => {
               case 'canceled':
                 sessionsToShow = canceledSessions;
                 break;
-              default:
-                sessionsToShow = [];
             }
             
             return (
@@ -156,7 +237,7 @@ const PhotographerSessions = () => {
                   </Card>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {sessionsToShow.map((session) => (
+                    {sessionsToShow.map((session: Session) => (
                       <Card key={session.id}>
                         <CardHeader>
                           <div className="flex justify-between items-start">
@@ -251,6 +332,19 @@ const PhotographerSessions = () => {
             </DialogContent>
           </Dialog>
         )}
+        
+        {/* Diálogo para criar nova sessão manualmente */}
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Criar Nova Sessão</DialogTitle>
+            </DialogHeader>
+            <CreateSessionForm 
+              onSuccess={() => setIsCreateDialogOpen(false)}
+              onCancel={() => setIsCreateDialogOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

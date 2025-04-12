@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import React from 'react';
 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -63,6 +64,13 @@ const SessionForm: React.FC<SessionFormProps> = ({
     onSave({
       ...values,
       date: date?.toISOString(),
+      clientId: session.clientId,
+      photographerId: session.photographerId,
+      serviceId: session.serviceId,
+      totalPrice: session.totalPrice || 0,
+      photosIncluded: session.photosIncluded || 0,
+      additionalPhotos: session.additionalPhotos || 0,
+      additionalPhotoPrice: session.additionalPhotoPrice || 0,
     });
   };
 
@@ -154,19 +162,19 @@ const SessionForm: React.FC<SessionFormProps> = ({
               >
                 <SelectTrigger className="w-24">
                   <SelectValue placeholder="Hora">
-                    <Clock className="h-4 w-4" />
+                    {date ? format(date, 'HH:mm') : <Clock className="h-4 w-4" />}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {Array.from({ length: 24 }).map((_, hour) => (
-                    <>
+                    <React.Fragment key={hour}>
                       <SelectItem key={`${hour}-00`} value={`${hour.toString().padStart(2, '0')}:00`}>
                         {hour.toString().padStart(2, '0')}:00
                       </SelectItem>
                       <SelectItem key={`${hour}-30`} value={`${hour.toString().padStart(2, '0')}:30`}>
                         {hour.toString().padStart(2, '0')}:30
                       </SelectItem>
-                    </>
+                    </React.Fragment>
                   ))}
                 </SelectContent>
               </Select>
