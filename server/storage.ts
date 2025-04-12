@@ -18,6 +18,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
   getUserWithProfile(id: number): Promise<UserWithProfile | undefined>;
+  getClientUsers(): Promise<User[]>;
   
   // Photographer Profiles
   getPhotographerProfile(userId: number): Promise<PhotographerProfile | undefined>;
@@ -139,6 +140,13 @@ export class MemStorage implements IStorage {
       ...user,
       photographerProfile,
     };
+  }
+
+  async getClientUsers(): Promise<User[]> {
+    // Filtrar apenas usuários do tipo client
+    return Array.from(this.users.values())
+      .filter(user => user.userType === "client")
+      .map(user => ({ ...user })); // Clone para evitar problemas de referência
   }
 
   // Photographer Profiles

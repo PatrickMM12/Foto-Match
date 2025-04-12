@@ -400,6 +400,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Buscar todos os clientes (para fotógrafos criarem sessões)
+  app.get("/api/users/clients", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      
+      // Verificar se o usuário é fotógrafo
+      if (user.userType !== "photographer") {
+        return res.status(403).json({ message: "Apenas fotógrafos podem acessar essa rota" });
+      }
+      
+      // Buscar todos os usuários do tipo client
+      const clients = await storage.getClientUsers();
+      
+      // Remover dados sensíveis como senha
+      const safeClients = clients.map(client => ({
+        ...client,
+        password: undefined
+      }));
+      
+      return res.json(safeClients);
+    } catch (error) {
+      console.error("Erro ao buscar clientes:", error);
+      return res.status(500).json({ message: "Erro ao buscar clientes" });
+    }
+  });
+
+  // Criar novo cliente (para fotógrafos registrarem clientes)
+  app.post("/api/users/clients", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      
+      // Verificar se o usuário é fotógrafo
+      if (user.userType !== "photographer") {
+        return res.status(403).json({ message: "Apenas fotógrafos podem criar clientes" });
+      }
+      
+      // Verificar dados necessários
+      const { name, email, phone } = req.body;
+      
+      if (!name || !email) {
+        return res.status(400).json({ message: "Nome e e-mail são obrigatórios" });
+      }
+      
+      // Verificar se já existe usuário com este e-mail
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(409).json({ message: "Já existe um usuário com este e-mail" });
+      }
+      
+      // Gerar uma senha temporária
+      const temporaryPassword = Math.random().toString(36).slice(-8);
+      
+      // Criar novo usuário do tipo cliente
+      const newClient = await storage.createUser({
+        name,
+        email,
+        password: temporaryPassword,
+        userType: "client",
+        phone: phone || ""
+      });
+      
+      // Remover a senha antes de retornar
+      const { password, ...clientWithoutPassword } = newClient;
+      
+      return res.status(201).json(clientWithoutPassword);
+    } catch (error) {
+      console.error("Erro ao criar cliente:", error);
+      return res.status(500).json({ message: "Erro ao criar cliente" });
+    }
+  });
+
   app.patch("/api/users/me", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
@@ -415,160 +486,256 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/photographers/profile", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      console.log('Requisição para perfil de fotógrafo recebida. Usuário:', user?.id, user?.email, user?.userType);
+      console.log('Requisição para perfil de fotógrafo recebida. Usuário:', user?.id);
       
+      // Verificar se o usuário é fotógrafo
       if (user.userType !== "photographer") {
-        console.log('Acesso negado: usuário não é fotógrafo:', user.userType);
-        return res.status(403).json({ message: "Only photographers can access this endpoint" });
+        return res.status(403).json({ message: "Apenas fotógrafos podem acessar essa rota" });
       }
       
+      // Buscar perfil do fotógrafo
       const profile = await storage.getPhotographerProfile(user.id);
+      
       console.log('Perfil de fotógrafo encontrado:', profile ? 'Sim' : 'Não');
       
       if (!profile) {
         console.log('Perfil de fotógrafo não encontrado para usuário:', user.id);
-        return res.status(404).json({ message: "Photographer profile not found" });
+        return res.status(404).json({ message: "Perfil de fotógrafo não encontrado" });
       }
       
-      console.log('Enviando dados do perfil:', profile);
-      res.json(profile);
+      // Não logar todo o objeto profile para evitar log excessivo
+      console.log('Enviando dados do perfil. ID:', profile.id);
+      
+      return res.status(200).json(profile);
     } catch (error) {
-      console.error("Error fetching photographer profile:", error);
-      res.status(500).json({ message: "Error fetching photographer profile" });
+      console.error("Erro ao buscar perfil de fotógrafo:", error);
+      return res.status(500).json({ message: "Erro ao buscar perfil de fotógrafo" });
     }
   });
 
   app.patch("/api/photographers/profile", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      console.log('Requisição de atualização de perfil recebida. Usuário:', user?.id, user?.email, user?.userType);
-      console.log('Dados recebidos:', req.body);
+      console.log('Requisição de atualização de perfil recebida. Usuário:', user?.id);
       
+      // Verificar se o usuário é fotógrafo
       if (user.userType !== "photographer") {
-        console.log('Acesso negado: usuário não é fotógrafo:', user.userType);
-        return res.status(403).json({ message: "Only photographers can access this endpoint" });
+        return res.status(403).json({ message: "Apenas fotógrafos podem atualizar o perfil" });
       }
       
-      const validatedData = insertPhotographerProfileSchema.partial().parse(req.body);
-      console.log('Dados validados:', validatedData);
-      
-      // Check if profile exists
-      const existingProfile = await storage.getPhotographerProfile(user.id);
-      console.log('Perfil existente encontrado:', existingProfile ? 'Sim' : 'Não');
-      
-      if (!existingProfile) {
-        // Create profile if it doesn't exist
-        console.log('Criando novo perfil para usuário:', user.id);
-        const newProfile = await storage.createPhotographerProfile({
-          userId: user.id,
-          ...validatedData,
-          specialties: validatedData.specialties || [],
-          portfolioImages: validatedData.portfolioImages || [],
-          availableTimes: validatedData.availableTimes || {},
-        });
-        console.log('Novo perfil criado:', newProfile);
-        return res.json(newProfile);
+      try {
+        // Validar dados do perfil
+        const validatedData = insertPhotographerProfileSchema.partial().parse(req.body);
+        
+        // Verificar se o perfil já existe
+        const existingProfile = await storage.getPhotographerProfile(user.id);
+        
+        console.log('Perfil existente encontrado:', existingProfile ? 'Sim' : 'Não');
+        
+        let updatedOrNewProfile;
+        
+        if (!existingProfile) {
+          console.log('Criando novo perfil para usuário:', user.id);
+          
+          const newProfile = await storage.createPhotographerProfile({
+            ...validatedData,
+            userId: user.id
+          });
+          
+          if (!newProfile) {
+            return res.status(500).json({ message: "Erro ao criar perfil de fotógrafo" });
+          }
+          
+          console.log('Novo perfil criado. ID:', newProfile.id);
+          updatedOrNewProfile = newProfile;
+        } else {
+          console.log('Atualizando perfil existente para usuário:', user.id);
+          
+          const updatedProfile = await storage.updatePhotographerProfile(user.id, validatedData);
+          
+          console.log('Perfil atualizado. ID:', updatedProfile?.id);
+          updatedOrNewProfile = updatedProfile;
+        }
+        
+        return res.status(200).json(updatedOrNewProfile);
+      } catch (error) {
+        if (error instanceof ZodError) {
+          console.error('Erro de validação:', fromZodError(error).message);
+          return res.status(400).json({ message: fromZodError(error).message });
+        }
+        throw error;
       }
-      
-      // Update existing profile
-      console.log('Atualizando perfil existente para usuário:', user.id);
-      const updatedProfile = await storage.updatePhotographerProfile(user.id, validatedData);
-      console.log('Perfil atualizado:', updatedProfile);
-      res.json(updatedProfile);
     } catch (error) {
-      if (error instanceof ZodError) {
-        console.error('Erro de validação:', fromZodError(error).message);
-        return res.status(400).json({ message: fromZodError(error).message });
-      }
       console.error("Error updating photographer profile:", error);
       res.status(500).json({ message: "Error updating photographer profile" });
     }
   });
 
-  // Service routes
-  app.get("/api/services", isAuthenticated, async (req, res) => {
+  // Rotas para gerenciamento de serviços
+  app.get("/api/photographers/services", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
-      if (user.userType !== "photographer") {
-        return res.status(403).json({ message: "Only photographers can access this endpoint" });
+      // Verificar se o usuário é fotógrafo
+      if (req.user.userType !== "photographer") {
+        return res.status(403).json({ message: "Acesso não autorizado. Apenas fotógrafos podem acessar serviços." });
       }
       
-      const services = await storage.getServices(user.id);
-      res.json(services);
-    } catch (error) {
-      console.error("Error fetching services:", error);
-      res.status(500).json({ message: "Error fetching services" });
+      const services = await storage.getServices(req.user.id);
+      
+      return res.status(200).json(services);
+    } catch (error: any) {
+      console.error("Erro ao buscar serviços:", error);
+      return res.status(500).json({ message: "Erro ao buscar serviços", details: error.message });
     }
   });
-
-  app.post("/api/services", isAuthenticated, async (req, res) => {
+  
+  app.post("/api/photographers/services", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
-      if (user.userType !== "photographer") {
-        return res.status(403).json({ message: "Only photographers can access this endpoint" });
+      console.log("POST /api/photographers/services - Dados recebidos:", req.body);
+      console.log("Tipo de conteúdo:", req.headers['content-type']);
+      
+      const result = insertServiceSchema.safeParse(req.body);
+      if (!result.success) {
+        console.log("Falha na validação do schema:", result.error);
+        console.log("Campos esperados pelo schema:", 
+          Object.keys(insertServiceSchema.shape).join(", "));
+        console.log("Campos recebidos:", Object.keys(req.body).join(", "));
+        return res.status(400).json({ 
+          message: "Dados inválidos", 
+          errors: result.error.format(),
+          detalhes: "Verificar nomes de campos (camelCase vs snake_case)" 
+        });
       }
       
-      const validatedData = insertServiceSchema.parse({
-        ...req.body,
-        userId: user.id,
+      console.log("Validação do schema bem-sucedida:", result.data);
+      
+      const userId = parseInt(String(req.user.id));
+      console.log(`Criando serviço para o usuário: ${userId} (${typeof userId})`);
+      
+      const service = await storage.createService({ ...result.data, userId });
+      return res.status(201).json(service);
+    } catch (error: any) {
+      console.error("Erro ao criar serviço:", error.message);
+      // Garantir que a resposta sempre seja JSON, mesmo em caso de erro
+      return res.status(500).json({ 
+        message: "Erro ao criar serviço", 
+        details: error.message,
+        stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
       });
-      
-      const service = await storage.createService(validatedData);
-      res.status(201).json(service);
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return res.status(400).json({ message: fromZodError(error).message });
-      }
-      console.error("Error creating service:", error);
-      res.status(500).json({ message: "Error creating service" });
     }
   });
-
-  app.patch("/api/services/:id", isAuthenticated, async (req, res) => {
+  
+  app.patch("/api/photographers/services/:id", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
       const serviceId = parseInt(req.params.id);
+      const currentUserId = parseInt(String(req.user.id));
       
-      // Check if service exists and belongs to user
-      const service = await storage.getService(serviceId);
-      if (!service) {
-        return res.status(404).json({ message: "Service not found" });
-      }
-      if (service.userId !== user.id) {
-        return res.status(403).json({ message: "You don't have permission to update this service" });
+      console.log(`PATCH /api/photographers/services/${serviceId} - Usuário ${currentUserId} tentando atualizar serviço`);
+      
+      // Verificar se o serviço existe
+      const existingService = await storage.getService(serviceId);
+      
+      if (!existingService) {
+        console.log(`Serviço ${serviceId} não encontrado`);
+        return res.status(404).json({ message: "Serviço não encontrado" });
       }
       
-      const validatedData = insertServiceSchema.partial().parse(req.body);
-      const updatedService = await storage.updateService(serviceId, validatedData);
-      res.json(updatedService);
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return res.status(400).json({ message: fromZodError(error).message });
+      console.log(`Serviço ${serviceId} encontrado:`);
+      console.log(`- ID do serviço: ${existingService.id}`);
+      console.log(`- ID do proprietário do serviço: ${existingService.userId} (${typeof existingService.userId})`);
+      console.log(`- ID do usuário atual: ${currentUserId} (${typeof currentUserId})`);
+      
+      // Garantir que ambos os IDs sejam strings para comparação segura
+      const serviceUserIdStr = String(existingService.userId);
+      const currentUserIdStr = String(currentUserId);
+      
+      console.log(`IDs convertidos para string: ${serviceUserIdStr} === ${currentUserIdStr}`);
+      console.log(`Resultado da comparação: ${serviceUserIdStr === currentUserIdStr}`);
+      
+      // Verificar se o serviço pertence ao usuário autenticado
+      if (serviceUserIdStr !== currentUserIdStr) {
+        console.log(`Acesso negado: Usuário ${currentUserIdStr} não tem permissão para editar serviço do usuário ${serviceUserIdStr}`);
+        return res.status(403).json({ message: "Você não tem permissão para editar este serviço" });
       }
-      console.error("Error updating service:", error);
-      res.status(500).json({ message: "Error updating service" });
+      
+      console.log(`Permissão concedida, atualizando serviço ${serviceId}`);
+      
+      // Atualizar serviço
+      const updatedService = await storage.updateService(serviceId, req.body);
+      
+      if (!updatedService) {
+        console.log(`Erro ao atualizar serviço ${serviceId}: serviço não retornado pelo storage`);
+        return res.status(500).json({ message: "Erro ao atualizar serviço" });
+      }
+      
+      console.log(`Serviço ${serviceId} atualizado com sucesso`);
+      return res.status(200).json(updatedService);
+    } catch (error: any) {
+      console.error("Erro ao atualizar serviço:", error);
+      return res.status(500).json({ message: "Erro ao atualizar serviço", details: error.message });
     }
   });
-
-  app.delete("/api/services/:id", isAuthenticated, async (req, res) => {
+  
+  app.delete("/api/photographers/services/:id", isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
       const serviceId = parseInt(req.params.id);
+      const currentUserId = parseInt(String(req.user.id));
       
-      // Check if service exists and belongs to user
+      console.log(`DELETE /api/photographers/services/${serviceId} - Usuário ${currentUserId} tentando excluir serviço`);
+      
+      // Verificar se o serviço existe
       const service = await storage.getService(serviceId);
       if (!service) {
-        return res.status(404).json({ message: "Service not found" });
-      }
-      if (service.userId !== user.id) {
-        return res.status(403).json({ message: "You don't have permission to delete this service" });
+        console.log(`Serviço ${serviceId} não encontrado`);
+        return res.status(404).json({ message: "Serviço não encontrado" });
       }
       
+      console.log(`Serviço ${serviceId} encontrado:`);
+      console.log(`- ID do proprietário do serviço: ${service.userId} (${typeof service.userId})`);
+      console.log(`- ID do usuário atual: ${currentUserId} (${typeof currentUserId})`);
+      
+      // Garantir que ambos os IDs sejam strings para comparação segura
+      const serviceUserIdStr = String(service.userId);
+      const currentUserIdStr = String(currentUserId);
+      
+      console.log(`IDs convertidos para string: ${serviceUserIdStr} === ${currentUserIdStr}`);
+      console.log(`Resultado da comparação: ${serviceUserIdStr === currentUserIdStr}`);
+      
+      // Verificar se o serviço pertence ao usuário autenticado
+      if (serviceUserIdStr !== currentUserIdStr) {
+        console.log(`Acesso negado: Usuário ${currentUserIdStr} não tem permissão para excluir serviço do usuário ${serviceUserIdStr}`);
+        return res.status(403).json({ message: "Você não tem permissão para deletar este serviço" });
+      }
+      
+      // Deletar o serviço
       await storage.deleteService(serviceId);
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting service:", error);
-      res.status(500).json({ message: "Error deleting service" });
+      console.log(`Serviço ${serviceId} excluído com sucesso`);
+      return res.status(200).json({ message: "Serviço deletado com sucesso" });
+    } catch (error: any) {
+      console.error("Erro ao excluir serviço:", error);
+      return res.status(500).json({ message: "Erro ao excluir serviço", details: error.message });
+    }
+  });
+  
+  // Rota para buscar serviços de um fotógrafo específico (para o cliente)
+  app.get("/api/photographers/:id/services", async (req, res) => {
+    try {
+      const photographerId = parseInt(req.params.id);
+      
+      // Verificar se o fotógrafo existe
+      const photographer = await storage.getUser(photographerId);
+      
+      if (!photographer || photographer.userType !== "photographer") {
+        return res.status(404).json({ message: "Fotógrafo não encontrado" });
+      }
+      
+      // Buscar apenas serviços ativos
+      const services = await storage.getServices(photographerId);
+      const activeServices = services.filter(service => service.active);
+      
+      return res.status(200).json(activeServices);
+    } catch (error: any) {
+      console.error("Erro ao buscar serviços do fotógrafo:", error);
+      return res.status(500).json({ message: "Erro ao buscar serviços do fotógrafo", details: error.message });
     }
   });
 
@@ -590,25 +757,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user as any;
       
-      // Only clients can create session requests
-      if (user.userType !== "client") {
-        return res.status(403).json({ message: "Only clients can create session requests" });
+      console.log("POST /api/sessions - Dados recebidos:", JSON.stringify(req.body, null, 2));
+      
+      // Verificar o tipo de usuário para determinar o comportamento
+      if (user.userType === "client") {
+        // Quando cliente cria a sessão, ele deve fornecer o photographerId
+        const validatedData = insertSessionSchema.parse({
+          ...req.body,
+          clientId: user.id,
+          status: "pending", // Sessões criadas por clientes começam como pendentes
+        });
+        
+        // Garantir que a data esteja no formato correto (Date) antes de salvar
+        if (typeof validatedData.date === 'string') {
+          validatedData.date = new Date(validatedData.date);
+        }
+        
+        const session = await storage.createSession(validatedData);
+        res.status(201).json(session);
+      } else if (user.userType === "photographer") {
+        // Quando fotógrafo cria a sessão, ele deve fornecer o clientId
+        // e pode definir o status inicial (confirmada por padrão)
+        const validatedData = insertSessionSchema.parse({
+          ...req.body,
+          photographerId: user.id,
+          status: req.body.status || "confirmed", // Sessões criadas por fotógrafos já começam confirmadas por padrão
+        });
+        
+        // Garantir que a data esteja no formato correto (Date) antes de salvar
+        if (typeof validatedData.date === 'string') {
+          validatedData.date = new Date(validatedData.date);
+        }
+        
+        const session = await storage.createSession(validatedData);
+        res.status(201).json(session);
+      } else {
+        return res.status(403).json({ message: "Tipo de usuário não autorizado a criar sessões" });
       }
-      
-      const validatedData = insertSessionSchema.parse({
-        ...req.body,
-        clientId: user.id,
-        status: "pending",
-      });
-      
-      const session = await storage.createSession(validatedData);
-      res.status(201).json(session);
     } catch (error) {
       if (error instanceof ZodError) {
+        console.error("Erro de validação Zod:", error.format());
         return res.status(400).json({ message: fromZodError(error).message });
       }
       console.error("Error creating session:", error);
-      res.status(500).json({ message: "Error creating session" });
+      // Retornar detalhes do erro para ajudar no diagnóstico
+      res.status(500).json({ 
+        message: "Error creating session",
+        details: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 

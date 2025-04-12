@@ -287,7 +287,7 @@ export class SupabaseStorage implements IStorage {
         .single();
       
       if (error) {
-        console.error(`Erro ao buscar perfil do fotógrafo:`, error);
+        console.error(`Erro ao buscar perfil para userId: ${userId}`, error);
         return undefined;
       }
       
@@ -296,40 +296,27 @@ export class SupabaseStorage implements IStorage {
         return undefined;
       }
       
-      console.log(`Perfil encontrado para userId: ${userId}`, data);
+      // Log simplificado sem mostrar todos os dados
+      console.log(`Perfil encontrado para userId: ${userId} [ID: ${data.id}]`);
       
-      // Mapear de snake_case para camelCase
-      const profile: any = { ...data };
-      if (profile.user_id) {
-        profile.userId = profile.user_id;
-        delete profile.user_id;
-      }
-      if (profile.instagram_username) {
-        profile.instagramUsername = profile.instagram_username;
-        delete profile.instagram_username;
-      }
-      if (profile.years_of_experience) {
-        profile.yearsOfExperience = profile.years_of_experience;
-        delete profile.years_of_experience;
-      }
-      if (profile.equipment_description) {
-        profile.equipmentDescription = profile.equipment_description;
-        delete profile.equipment_description;
-      }
-      if (profile.portfolio_images) {
-        profile.portfolioImages = profile.portfolio_images;
-        delete profile.portfolio_images;
-      }
-      if (profile.available_times) {
-        profile.availableTimes = profile.available_times;
-        delete profile.available_times;
-      }
+      // Converter de snake_case para camelCase antes de retornar
+      const profile: any = {
+        id: data.id,
+        userId: data.user_id,
+        instagramUsername: data.instagram_username,
+        specialties: data.specialties || [],
+        yearsOfExperience: data.years_of_experience,
+        equipmentDescription: data.equipment_description,
+        portfolioImages: data.portfolio_images || [],
+        availableTimes: data.available_times || {}
+      };
       
-      console.log(`Perfil formatado para userId: ${userId}`, profile);
+      // Log simplificado sem mostrar todos os dados
+      console.log(`Perfil formatado para userId: ${userId} [ID: ${profile.id}]`);
       
-      return profile;
-    } catch (err) {
-      console.error(`Erro inesperado ao buscar perfil do fotógrafo:`, err);
+      return profile as PhotographerProfile;
+    } catch (error) {
+      console.error(`Erro não tratado ao buscar perfil para userId: ${userId}`, error);
       return undefined;
     }
   }
@@ -365,108 +352,356 @@ export class SupabaseStorage implements IStorage {
   }
 
   async updatePhotographerProfile(userId: number, profileData: Partial<InsertPhotographerProfile>): Promise<PhotographerProfile | undefined> {
-    // Mapear campos camelCase para snake_case
-    const dbProfileData: any = {};
-    
-    if (profileData.instagramUsername !== undefined) dbProfileData.instagram_username = profileData.instagramUsername;
-    if (profileData.specialties !== undefined) dbProfileData.specialties = profileData.specialties || [];
-    if (profileData.yearsOfExperience !== undefined) dbProfileData.years_of_experience = profileData.yearsOfExperience;
-    if (profileData.equipmentDescription !== undefined) dbProfileData.equipment_description = profileData.equipmentDescription;
-    if (profileData.portfolioImages !== undefined) dbProfileData.portfolio_images = profileData.portfolioImages || [];
-    if (profileData.availableTimes !== undefined) dbProfileData.available_times = profileData.availableTimes || {};
-    
-    console.log('Atualizando perfil de fotógrafo:', userId, dbProfileData);
-    
-    const { data, error } = await supabase
-      .from('photographer_profiles')
-      .update(dbProfileData)
-      .eq('user_id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Erro ao atualizar perfil do fotógrafo:', error);
+    try {
+      // Verificar se o perfil existe
+      const existingProfile = await this.getPhotographerProfile(userId);
+      
+      if (!existingProfile) {
+        console.log(`Criando perfil para userId: ${userId} pois não existe`);
+        return await this.createPhotographerProfile({
+          ...profileData as InsertPhotographerProfile,
+          userId
+        });
+      }
+      
+      // Preparar dados para atualização
+      const dbProfileData: any = { ...profileData };
+      
+      // Mapear camelCase para snake_case
+      if ('userId' in profileData) {
+        dbProfileData.user_id = profileData.userId;
+        delete dbProfileData.userId;
+      }
+      
+      if ('instagramUsername' in profileData) {
+        dbProfileData.instagram_username = profileData.instagramUsername;
+        delete dbProfileData.instagramUsername;
+      }
+      
+      if ('yearsOfExperience' in profileData) {
+        dbProfileData.years_of_experience = profileData.yearsOfExperience;
+        delete dbProfileData.yearsOfExperience;
+      }
+      
+      if ('equipmentDescription' in profileData) {
+        dbProfileData.equipment_description = profileData.equipmentDescription;
+        delete dbProfileData.equipmentDescription;
+      }
+      
+      if ('portfolioImages' in profileData) {
+        dbProfileData.portfolio_images = profileData.portfolioImages;
+        delete dbProfileData.portfolioImages;
+      }
+      
+      if ('availableTimes' in profileData) {
+        dbProfileData.available_times = profileData.availableTimes;
+        delete dbProfileData.availableTimes;
+      }
+      
+      // Log simplificado sem mostrar dados detalhados
+      console.log(`Atualizando perfil de fotógrafo: userId=${userId}, profileId=${existingProfile.id}`);
+      
+      // Atualizar perfil
+      const { data, error } = await supabase
+        .from('photographer_profiles')
+        .update(dbProfileData)
+        .eq('user_id', userId)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error(`Erro ao atualizar perfil para userId: ${userId}`, error);
+        return undefined;
+      }
+      
+      // Converter de snake_case para camelCase antes de retornar
+      const updatedProfile: any = {
+        id: data.id,
+        userId: data.user_id,
+        instagramUsername: data.instagram_username,
+        specialties: data.specialties || [],
+        yearsOfExperience: data.years_of_experience,
+        equipmentDescription: data.equipment_description,
+        portfolioImages: data.portfolio_images || [],
+        availableTimes: data.available_times || {}
+      };
+      
+      console.log(`Perfil atualizado com sucesso: userId=${userId}, profileId=${updatedProfile.id}`);
+      
+      return updatedProfile as PhotographerProfile;
+    } catch (error) {
+      console.error(`Erro não tratado ao atualizar perfil para userId: ${userId}`, error);
       return undefined;
     }
-    
-    if (!data) {
-      console.error('Nenhum dado retornado após atualização do perfil');
-      return undefined;
-    }
-    
-    // Mapear de volta para camelCase
-    const resultProfile: any = { ...data };
-    if (resultProfile.user_id) {
-      resultProfile.userId = resultProfile.user_id;
-      delete resultProfile.user_id;
-    }
-    if ('instagram_username' in resultProfile) {
-      resultProfile.instagramUsername = resultProfile.instagram_username;
-      delete resultProfile.instagram_username;
-    }
-    if ('years_of_experience' in resultProfile) {
-      resultProfile.yearsOfExperience = resultProfile.years_of_experience;
-      delete resultProfile.years_of_experience;
-    }
-    if ('equipment_description' in resultProfile) {
-      resultProfile.equipmentDescription = resultProfile.equipment_description;
-      delete resultProfile.equipment_description;
-    }
-    if ('portfolio_images' in resultProfile) {
-      resultProfile.portfolioImages = resultProfile.portfolio_images;
-      delete resultProfile.portfolio_images;
-    }
-    if ('available_times' in resultProfile) {
-      resultProfile.availableTimes = resultProfile.available_times;
-      delete resultProfile.available_times;
-    }
-    
-    return resultProfile as PhotographerProfile;
   }
 
   // Services
   async getServices(userId: number): Promise<Service[]> {
-    const { data, error } = await supabase
-      .from('services')
-      .select('*')
-      .eq('userId', userId);
+    console.log("SupabaseStorage.getServices - Buscando serviços para userId:", userId);
     
-    if (error || !data) return [];
-    return data as Service[];
+    try {
+      console.log("SupabaseStorage.getServices - Executando consulta com user_id =", userId);
+      
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (error) {
+        console.error("SupabaseStorage.getServices - Erro do Supabase:", error);
+        return [];
+      }
+      
+      if (!data || data.length === 0) {
+        console.log("SupabaseStorage.getServices - Nenhum serviço encontrado para userId:", userId);
+        
+        // Verificar se há serviços sem filtro de userId para diagnóstico
+        console.log("SupabaseStorage.getServices - Verificando todos os serviços na tabela");
+        const { data: allData, error: allError } = await supabase
+          .from('services')
+          .select('*');
+          
+        if (!allError && allData && allData.length > 0) {
+          console.log(`SupabaseStorage.getServices - Encontrados ${allData.length} serviços no total`);
+          const uniqueUserIds = Array.from(new Set(allData.map(s => s.user_id)));
+          console.log(`SupabaseStorage.getServices - IDs de usuários existentes: ${uniqueUserIds.join(', ')}`);
+        }
+        
+        return [];
+      }
+      
+      // Converter de snake_case para camelCase nos resultados
+      const services = data.map(service => {
+        // Criar um novo objeto para não modificar o original
+        const formattedService: any = {};
+        
+        // Mapear os campos específicos para garantir a conversão correta
+        formattedService.id = service.id;
+        formattedService.userId = service.user_id; // Converter user_id para userId
+        formattedService.name = service.name;
+        formattedService.description = service.description;
+        formattedService.price = service.price;
+        formattedService.duration = service.duration;
+        formattedService.maxPhotos = service.max_photos; // Converter max_photos para maxPhotos
+        formattedService.additionalPhotoPrice = service.additional_photo_price; // Converter para additionalPhotoPrice
+        formattedService.active = service.active;
+        
+        return formattedService;
+      });
+      
+      console.log(`SupabaseStorage.getServices - ${services.length} serviços convertidos para userId:`, userId);
+      console.log("SupabaseStorage.getServices - Serviços formatados:", services.map(s => ({ id: s.id, userId: s.userId, name: s.name })));
+      
+      return services as Service[];
+    } catch (error) {
+      console.error("SupabaseStorage.getServices - Erro não tratado:", error);
+      return [];
+    }
   }
 
   async getService(id: number): Promise<Service | undefined> {
-    const { data, error } = await supabase
-      .from('services')
-      .select('*')
-      .eq('id', id)
-      .single();
+    console.log("SupabaseStorage.getService - Buscando serviço ID:", id);
     
-    if (error || !data) return undefined;
-    return data as Service;
+    try {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        console.error("SupabaseStorage.getService - Erro do Supabase:", error);
+        return undefined;
+      }
+      
+      if (!data) {
+        console.log("SupabaseStorage.getService - Serviço não encontrado para ID:", id);
+        return undefined;
+      }
+      
+      // Converter de snake_case para camelCase - criar um novo objeto com os campos mapeados explicitamente
+      const formattedService: any = {
+        id: data.id,
+        userId: data.user_id, // Converter user_id para userId
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        duration: data.duration,
+        maxPhotos: data.max_photos, // Converter max_photos para maxPhotos
+        additionalPhotoPrice: data.additional_photo_price, // Converter para additionalPhotoPrice
+        active: data.active
+      };
+      
+      console.log("SupabaseStorage.getService - Serviço encontrado:", 
+        { id: formattedService.id, userId: formattedService.userId, name: formattedService.name });
+      
+      return formattedService as Service;
+    } catch (error) {
+      console.error("SupabaseStorage.getService - Erro não tratado:", error);
+      return undefined;
+    }
   }
 
   async createService(service: InsertService): Promise<Service> {
-    const { data, error } = await supabase
-      .from('services')
-      .insert(service)
-      .select()
-      .single();
+    console.log("SupabaseStorage.createService - Iniciando criação de serviço para userId:", service.userId);
+    
+    try {
+      // Verificar se os campos obrigatórios estão presentes
+      if (!service.userId) {
+        console.error("SupabaseStorage.createService - userId não fornecido");
+        throw new Error("userId é obrigatório para criar um serviço");
+      }
+      
+      if (!service.name) {
+        console.error("SupabaseStorage.createService - name não fornecido");
+        throw new Error("name é obrigatório para criar um serviço");
+      }
+      
+      if (service.price === undefined || service.price === null) {
+        console.error("SupabaseStorage.createService - price não fornecido");
+        throw new Error("price é obrigatório para criar um serviço");
+      }
+      
+      if (service.duration === undefined || service.duration === null) {
+        console.error("SupabaseStorage.createService - duration não fornecido");
+        throw new Error("duration é obrigatório para criar um serviço");
+      }
+      
+      // Preparar dados para inserção, mapeando campos conforme necessário
+      const dbService: any = {};
+      
+      // Mapear campos camelCase para snake_case para o banco de dados
+      dbService.user_id = service.userId;
+      dbService.name = service.name;
+      dbService.description = service.description;
+      dbService.price = service.price;
+      dbService.duration = service.duration;
+      dbService.active = service.active !== undefined ? service.active : true;
+      
+      // Campos opcionais
+      if (service.maxPhotos !== undefined && service.maxPhotos !== null) {
+        dbService.max_photos = service.maxPhotos;
+      }
+      
+      if (service.additionalPhotoPrice !== undefined && service.additionalPhotoPrice !== null) {
+        dbService.additional_photo_price = service.additionalPhotoPrice;
+      }
+      
+      // Log simplificado sem exibir os dados completos
+      console.log("SupabaseStorage.createService - Dados preparados para inserção no banco");
+      
+      // Fazer requisição ao Supabase
+      console.log("SupabaseStorage.createService - Fazendo requisição ao Supabase");
+      const { data, error } = await supabase
+        .from('services')
+        .insert(dbService)
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data as Service;
+      if (error) {
+        console.error("SupabaseStorage.createService - Erro do Supabase:", error);
+        throw error;
+      }
+      
+      if (!data) {
+        console.error("SupabaseStorage.createService - Nenhum dado retornado pelo Supabase");
+        throw new Error("Nenhum dado retornado ao criar o serviço");
+      }
+      
+      // Converter de snake_case para camelCase antes de retornar
+      const resultService: any = { ...data };
+      if ('additional_photo_price' in resultService) {
+        resultService.additionalPhotoPrice = resultService.additional_photo_price;
+        delete resultService.additional_photo_price;
+      }
+      
+      console.log("SupabaseStorage.createService - Serviço criado com sucesso. ID:", resultService.id);
+      return resultService as Service;
+    } catch (error) {
+      console.error("SupabaseStorage.createService - Erro não tratado:", error);
+      throw error;
+    }
   }
 
   async updateService(id: number, serviceData: Partial<InsertService>): Promise<Service | undefined> {
-    const { data, error } = await supabase
-      .from('services')
-      .update(serviceData)
-      .eq('id', id)
-      .select()
-      .single();
+    console.log("SupabaseStorage.updateService - Atualizando serviço:", id);
+    
+    try {
+      // Preparar dados para atualização, mapeando campos de camelCase para snake_case
+      const dbServiceData: any = {};
+      
+      // Mapear os campos de forma explícita
+      if ('userId' in serviceData) {
+        dbServiceData.user_id = serviceData.userId;
+      }
+      
+      if ('name' in serviceData) {
+        dbServiceData.name = serviceData.name;
+      }
+      
+      if ('description' in serviceData) {
+        dbServiceData.description = serviceData.description;
+      }
+      
+      if ('price' in serviceData) {
+        dbServiceData.price = serviceData.price;
+      }
+      
+      if ('duration' in serviceData) {
+        dbServiceData.duration = serviceData.duration;
+      }
+      
+      if ('maxPhotos' in serviceData) {
+        dbServiceData.max_photos = serviceData.maxPhotos;
+      }
+      
+      if ('additionalPhotoPrice' in serviceData) {
+        dbServiceData.additional_photo_price = serviceData.additionalPhotoPrice;
+      }
+      
+      if ('active' in serviceData) {
+        dbServiceData.active = serviceData.active;
+      }
+      
+      console.log("SupabaseStorage.updateService - Dados formatados para atualização:", dbServiceData);
+      
+      // Fazer requisição ao Supabase
+      const { data, error } = await supabase
+        .from('services')
+        .update(dbServiceData)
+        .eq('id', id)
+        .select()
+        .single();
 
-    if (error || !data) return undefined;
-    return data as Service;
+      if (error) {
+        console.error("SupabaseStorage.updateService - Erro do Supabase:", error);
+        return undefined;
+      }
+      
+      if (!data) {
+        console.error("SupabaseStorage.updateService - Nenhum dado retornado pelo Supabase");
+        return undefined;
+      }
+      
+      // Converter de snake_case para camelCase antes de retornar
+      const resultService: any = {
+        id: data.id,
+        userId: data.user_id,
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        duration: data.duration,
+        maxPhotos: data.max_photos,
+        additionalPhotoPrice: data.additional_photo_price,
+        active: data.active
+      };
+      
+      console.log("SupabaseStorage.updateService - Serviço atualizado com sucesso. ID:", resultService.id);
+      return resultService as Service;
+    } catch (error) {
+      console.error("SupabaseStorage.updateService - Erro não tratado:", error);
+      return undefined;
+    }
   }
 
   async deleteService(id: number): Promise<boolean> {
@@ -480,52 +715,221 @@ export class SupabaseStorage implements IStorage {
 
   // Sessions
   async getSessions(userId: number, userType: 'photographer' | 'client'): Promise<Session[]> {
-    const field = userType === 'photographer' ? 'photographerId' : 'clientId';
+    const field = userType === 'photographer' ? 'photographer_id' : 'client_id';
+    
+    console.log(`Buscando sessões para ${userType} com ID ${userId}`);
     
     const { data, error } = await supabase
       .from('sessions')
       .select('*')
       .eq(field, userId);
     
-    if (error || !data) return [];
-    return data as Session[];
+    if (error) {
+      console.error("Erro ao buscar sessões:", error);
+      return [];
+    }
+    
+    if (!data || data.length === 0) {
+      console.log(`Nenhuma sessão encontrada para ${userType} com ID ${userId}`);
+      return [];
+    }
+    
+    // Converter os campos de snake_case para camelCase
+    const sessions = data.map(session => {
+      const formattedSession: any = {
+        id: session.id,
+        photographerId: session.photographer_id,
+        clientId: session.client_id,
+        serviceId: session.service_id,
+        title: session.title,
+        description: session.description,
+        date: session.date,
+        duration: session.duration,
+        location: session.location,
+        locationLat: session.location_lat,
+        locationLng: session.location_lng,
+        status: session.status,
+        totalPrice: session.total_price,
+        photosDelivered: session.photos_delivered,
+        photosIncluded: session.photos_included,
+        additionalPhotos: session.additional_photos,
+        additionalPhotoPrice: session.additional_photo_price,
+        paymentStatus: session.payment_status,
+        amountPaid: session.amount_paid,
+        createdAt: session.created_at
+      };
+      
+      return formattedSession;
+    });
+    
+    console.log(`Retornando ${sessions.length} sessões convertidas`);
+    
+    return sessions as Session[];
   }
 
   async getSession(id: number): Promise<Session | undefined> {
+    console.log(`Buscando sessão com ID ${id}`);
+    
     const { data, error } = await supabase
       .from('sessions')
       .select('*')
       .eq('id', id)
       .single();
     
-    if (error || !data) return undefined;
-    return data as Session;
+    if (error) {
+      console.error("Erro ao buscar sessão:", error);
+      return undefined;
+    }
+    
+    if (!data) {
+      console.log(`Nenhuma sessão encontrada com ID ${id}`);
+      return undefined;
+    }
+    
+    // Converter os campos de snake_case para camelCase
+    const formattedSession: any = {
+      id: data.id,
+      photographerId: data.photographer_id,
+      clientId: data.client_id,
+      serviceId: data.service_id,
+      title: data.title,
+      description: data.description,
+      date: data.date,
+      duration: data.duration,
+      location: data.location,
+      locationLat: data.location_lat,
+      locationLng: data.location_lng,
+      status: data.status,
+      totalPrice: data.total_price,
+      photosDelivered: data.photos_delivered,
+      photosIncluded: data.photos_included,
+      additionalPhotos: data.additional_photos,
+      additionalPhotoPrice: data.additional_photo_price,
+      paymentStatus: data.payment_status,
+      amountPaid: data.amount_paid,
+      createdAt: data.created_at
+    };
+    
+    console.log(`Sessão encontrada e convertida: ID ${formattedSession.id}`);
+    
+    return formattedSession as Session;
   }
 
   async createSession(session: InsertSession): Promise<Session> {
+    // Converter campos de camelCase para snake_case
+    const snakeCaseSession: any = {};
+    
+    // Mapeamento explícito de cada campo
+    if (session.clientId !== undefined) snakeCaseSession.client_id = session.clientId;
+    if (session.photographerId !== undefined) snakeCaseSession.photographer_id = session.photographerId;
+    if (session.serviceId !== undefined) snakeCaseSession.service_id = session.serviceId;
+    if (session.title !== undefined) snakeCaseSession.title = session.title;
+    if (session.description !== undefined) snakeCaseSession.description = session.description;
+    if (session.date !== undefined) snakeCaseSession.date = session.date;
+    if (session.duration !== undefined) snakeCaseSession.duration = session.duration;
+    if (session.location !== undefined) snakeCaseSession.location = session.location;
+    if (session.locationLat !== undefined) snakeCaseSession.location_lat = session.locationLat;
+    if (session.locationLng !== undefined) snakeCaseSession.location_lng = session.locationLng;
+    if (session.status !== undefined) snakeCaseSession.status = session.status;
+    if (session.totalPrice !== undefined) snakeCaseSession.total_price = session.totalPrice;
+    if (session.photosDelivered !== undefined) snakeCaseSession.photos_delivered = session.photosDelivered;
+    if (session.photosIncluded !== undefined) snakeCaseSession.photos_included = session.photosIncluded;
+    if (session.additionalPhotos !== undefined) snakeCaseSession.additional_photos = session.additionalPhotos;
+    if (session.additionalPhotoPrice !== undefined) snakeCaseSession.additional_photo_price = session.additionalPhotoPrice;
+    if (session.paymentStatus !== undefined) snakeCaseSession.payment_status = session.paymentStatus;
+    if (session.amountPaid !== undefined) snakeCaseSession.amount_paid = session.amountPaid;
+    
+    console.log("Dados de sessão formatados para snake_case:", snakeCaseSession);
+    
     const { data, error } = await supabase
       .from('sessions')
       .insert({
-        ...session,
-        createdAt: new Date()
+        ...snakeCaseSession,
+        created_at: new Date()
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Erro ao criar sessão:", error);
+      throw error;
+    }
+    
     return data as Session;
   }
 
   async updateSession(id: number, sessionData: Partial<InsertSession>): Promise<Session | undefined> {
+    console.log(`Atualizando sessão com ID ${id}`);
+    
+    // Converter campos de camelCase para snake_case
+    const snakeCaseSession: any = {};
+    
+    // Mapeamento explícito de cada campo
+    if (sessionData.clientId !== undefined) snakeCaseSession.client_id = sessionData.clientId;
+    if (sessionData.photographerId !== undefined) snakeCaseSession.photographer_id = sessionData.photographerId;
+    if (sessionData.serviceId !== undefined) snakeCaseSession.service_id = sessionData.serviceId;
+    if (sessionData.title !== undefined) snakeCaseSession.title = sessionData.title;
+    if (sessionData.description !== undefined) snakeCaseSession.description = sessionData.description;
+    if (sessionData.date !== undefined) snakeCaseSession.date = sessionData.date;
+    if (sessionData.duration !== undefined) snakeCaseSession.duration = sessionData.duration;
+    if (sessionData.location !== undefined) snakeCaseSession.location = sessionData.location;
+    if (sessionData.locationLat !== undefined) snakeCaseSession.location_lat = sessionData.locationLat;
+    if (sessionData.locationLng !== undefined) snakeCaseSession.location_lng = sessionData.locationLng;
+    if (sessionData.status !== undefined) snakeCaseSession.status = sessionData.status;
+    if (sessionData.totalPrice !== undefined) snakeCaseSession.total_price = sessionData.totalPrice;
+    if (sessionData.photosDelivered !== undefined) snakeCaseSession.photos_delivered = sessionData.photosDelivered;
+    if (sessionData.photosIncluded !== undefined) snakeCaseSession.photos_included = sessionData.photosIncluded;
+    if (sessionData.additionalPhotos !== undefined) snakeCaseSession.additional_photos = sessionData.additionalPhotos;
+    if (sessionData.additionalPhotoPrice !== undefined) snakeCaseSession.additional_photo_price = sessionData.additionalPhotoPrice;
+    if (sessionData.paymentStatus !== undefined) snakeCaseSession.payment_status = sessionData.paymentStatus;
+    if (sessionData.amountPaid !== undefined) snakeCaseSession.amount_paid = sessionData.amountPaid;
+    
+    console.log("Dados de atualização de sessão formatados para snake_case:", snakeCaseSession);
+    
     const { data, error } = await supabase
       .from('sessions')
-      .update(sessionData)
+      .update(snakeCaseSession)
       .eq('id', id)
       .select()
       .single();
 
-    if (error || !data) return undefined;
-    return data as Session;
+    if (error) {
+      console.error("Erro ao atualizar sessão:", error);
+      return undefined;
+    }
+    
+    if (!data) {
+      console.log(`Nenhum dado retornado ao atualizar sessão com ID ${id}`);
+      return undefined;
+    }
+    
+    // Converter os campos de snake_case para camelCase para retornar
+    const formattedSession: any = {
+      id: data.id,
+      photographerId: data.photographer_id,
+      clientId: data.client_id,
+      serviceId: data.service_id,
+      title: data.title,
+      description: data.description,
+      date: data.date,
+      duration: data.duration,
+      location: data.location,
+      locationLat: data.location_lat,
+      locationLng: data.location_lng,
+      status: data.status,
+      totalPrice: data.total_price,
+      photosDelivered: data.photos_delivered,
+      photosIncluded: data.photos_included,
+      additionalPhotos: data.additional_photos,
+      additionalPhotoPrice: data.additional_photo_price,
+      paymentStatus: data.payment_status,
+      amountPaid: data.amount_paid,
+      createdAt: data.created_at
+    };
+    
+    console.log(`Sessão atualizada: ID ${formattedSession.id}`);
+    
+    return formattedSession as Session;
   }
 
   async deleteSession(id: number): Promise<boolean> {
@@ -542,7 +946,7 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .eq('userId', userId);
+      .eq('user_id', userId);
     
     if (error || !data) return [];
     return data as Transaction[];
@@ -596,7 +1000,7 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('reviews')
       .select('*')
-      .eq('photographerId', photographerId);
+      .eq('user_id', photographerId);
     
     if (error || !data) return [];
     return data as Review[];
@@ -606,7 +1010,7 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('reviews')
       .select('*')
-      .eq('reviewerId', clientId);
+      .eq('user_id', clientId);
     
     if (error || !data) return [];
     return data as Review[];
@@ -642,7 +1046,7 @@ export class SupabaseStorage implements IStorage {
     const { data, error } = await supabase
       .from('portfolio_items')
       .select('*')
-      .eq('userId', userId);
+      .eq('user_id', userId);
     
     if (error || !data) return [];
     return data as PortfolioItem[];
@@ -747,8 +1151,42 @@ export class SupabaseStorage implements IStorage {
     return resultsWithProfiles;
   }
 
-  private degToRad(deg: number): number {
-    return deg * (Math.PI/180);
+  // Método para buscar todos os usuários do tipo client
+  async getClientUsers(): Promise<User[]> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('user_type', 'client');
+      
+      if (error) {
+        console.error("Erro ao buscar clientes:", error);
+        return [];
+      }
+      
+      if (!data) {
+        return [];
+      }
+      
+      // Mapear user_type para userType para manter consistência
+      const clients = data.map(client => {
+        const formattedClient: any = { ...client };
+        if (formattedClient.user_type) {
+          formattedClient.userType = formattedClient.user_type;
+          delete formattedClient.user_type;
+        }
+        return formattedClient as User;
+      });
+      
+      return clients;
+    } catch (error) {
+      console.error("Erro não tratado ao buscar clientes:", error);
+      return [];
+    }
+  }
+  
+  private degToRad(degrees: number): number {
+    return degrees * (Math.PI/180);
   }
 }
 

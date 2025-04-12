@@ -122,6 +122,17 @@ export const insertServiceSchema = createInsertSchema(services).omit({
 export const insertSessionSchema = createInsertSchema(sessions).omit({
   id: true,
   createdAt: true
+}).extend({
+  date: z.string().or(z.date()),
+  additionalPhotos: z.number().optional().describe("Mapeado para additional_photos"),
+  additionalPhotoPrice: z.number().optional().describe("Mapeado para additional_photo_price"),
+  photosIncluded: z.number().optional().describe("Mapeado para photos_included"),
+  photosDelivered: z.number().optional().describe("Mapeado para photos_delivered"),
+  totalPrice: z.number().optional().describe("Mapeado para total_price"),
+  paymentStatus: z.string().optional().describe("Mapeado para payment_status"),
+  amountPaid: z.number().optional().describe("Mapeado para amount_paid"),
+  locationLat: z.number().optional().describe("Mapeado para location_lat"),
+  locationLng: z.number().optional().describe("Mapeado para location_lng")
 });
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
