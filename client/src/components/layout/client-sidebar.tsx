@@ -9,7 +9,6 @@ import {
   Search, 
   User, 
   Calendar, 
-  LogOut, 
   Menu, 
   X, 
   Camera 
@@ -31,31 +30,6 @@ const ClientSidebar = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest('POST', '/api/auth/logout', {});
-    },
-    onSuccess: () => {
-      toast({
-        title: 'Logout realizado',
-        description: 'Você saiu da sua conta com sucesso.',
-      });
-      navigate('/');
-      window.location.reload(); // Ensure all auth state is cleared
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Erro ao fazer logout',
-        description: error.message || 'Ocorreu um erro ao sair da conta.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const handleLogout = () => {
-    logoutMutation.mutate();
-  };
 
   const isActive = (path: string) => {
     return location.startsWith(path);
@@ -93,16 +67,6 @@ const ClientSidebar = () => {
             </Link>
           ))}
         </nav>
-        <div className="mt-auto pt-6 border-t border-gray-200">
-          <Button 
-            variant="ghost" 
-            className="w-full flex items-center justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-5 w-5 mr-3" />
-            <span>Sair</span>
-          </Button>
-        </div>
       </div>
     </div>
   );
@@ -149,19 +113,6 @@ const ClientSidebar = () => {
                 </Link>
               ))}
             </nav>
-            <div className="mt-auto pt-6 border-t border-gray-200">
-              <Button 
-                variant="ghost" 
-                className="w-full flex items-center justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => {
-                  handleLogout();
-                  setIsMobileMenuOpen(false);
-                }}
-              >
-                <LogOut className="h-5 w-5 mr-3" />
-                <span>Sair</span>
-              </Button>
-            </div>
           </div>
         </SheetContent>
       </Sheet>
