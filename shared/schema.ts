@@ -119,20 +119,23 @@ export const insertServiceSchema = createInsertSchema(services).omit({
   id: true
 });
 
-export const insertSessionSchema = createInsertSchema(sessions).omit({
-  id: true,
-  createdAt: true
-}).extend({
-  date: z.string().or(z.date()),
-  additionalPhotos: z.number().optional().describe("Mapeado para additional_photos"),
-  additionalPhotoPrice: z.number().optional().describe("Mapeado para additional_photo_price"),
-  photosIncluded: z.number().optional().describe("Mapeado para photos_included"),
-  photosDelivered: z.number().optional().describe("Mapeado para photos_delivered"),
-  totalPrice: z.number().optional().describe("Mapeado para total_price"),
-  paymentStatus: z.string().optional().describe("Mapeado para payment_status"),
-  amountPaid: z.number().optional().describe("Mapeado para amount_paid"),
-  locationLat: z.number().optional().describe("Mapeado para location_lat"),
-  locationLng: z.number().optional().describe("Mapeado para location_lng")
+export const insertSessionSchema = z.object({
+  photographerId: z.number(),
+  clientId: z.number(),
+  serviceId: z.number(),
+  title: z.string().min(3, "Título deve ter pelo menos 3 caracteres"),
+  description: z.string().optional(),
+  date: z.union([z.string(), z.date()]),
+  duration: z.number().min(1, "Duração deve ser pelo menos 1 minuto"),
+  location: z.string().min(3, "Local deve ter pelo menos 3 caracteres"),
+  status: z.enum(["pending", "confirmed", "completed", "canceled"]).default("pending"),
+  totalPrice: z.number().min(0, "Preço total não pode ser negativo"), // Valor em reais, não centavos
+  photosIncluded: z.number().min(0, "Número de fotos incluídas não pode ser negativo"),
+  photosDelivered: z.number().min(0, "Número de fotos entregues não pode ser negativo").default(0),
+  additionalPhotos: z.number().min(0, "Número de fotos adicionais não pode ser negativo").default(0),
+  additionalPhotoPrice: z.coerce.number().min(0, "Preço de fotos adicionais não pode ser negativo").default(0), // Garantir que seja sempre um número
+  paymentStatus: z.enum(["pending", "partial", "paid"]).default("pending"),
+  amountPaid: z.number().min(0, "Valor pago não pode ser negativo").default(0), // Valor em reais, não centavos
 });
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({

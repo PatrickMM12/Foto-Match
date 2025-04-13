@@ -777,12 +777,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(201).json(session);
       } else if (user.userType === "photographer") {
         // Quando fotógrafo cria a sessão, ele deve fornecer o clientId
-        // e pode definir o status inicial (confirmada por padrão)
-        const validatedData = insertSessionSchema.parse({
-          ...req.body,
-          photographerId: user.id,
-          status: req.body.status || "confirmed", // Sessões criadas por fotógrafos já começam confirmadas por padrão
-        });
+        
+        // Verificar se já temos o photographerId na requisição
+        const sessionData = { ...req.body };
+        
+        // Verificar se o photographerId enviado corresponde ao ID do usuário atual
+        if (sessionData.photographerId && sessionData.photographerId !== user.id) {
+          return res.status(403).json({ 
+            message: "Você não tem permissão para criar sessões em nome de outro fotógrafo" 
+          });
+        }
+        
+        // Garantir que o photographerId seja o do usuário atual
+        if (sessionData.photographerId === undefined || sessionData.photographerId === null || sessionData.photographerId !== user.id) {
+          console.log(`Definindo photographerId como ${user.id} (fotograferId anterior: ${sessionData.photographerId || 'undefined'})`);
+          sessionData.photographerId = user.id;
+        }
+        
+        // Garantir que o photographerId nunca seja undefined
+        if (sessionData.photographerId === undefined || sessionData.photographerId === null) {
+          console.error("photographerId ainda está undefined após verificação. Forçando como user.id");
+          sessionData.photographerId = user.id;
+        }
+        
+        // Definir o status padrão se não foi fornecido
+        if (!sessionData.status) {
+          sessionData.status = "confirmed"; // Sessões criadas por fotógrafos já começam confirmadas por padrão
+        }
+        
+        console.log("Dados da sessão após ajustes:", sessionData);
+        
+        const validatedData = insertSessionSchema.parse(sessionData);
         
         // Garantir que a data esteja no formato correto (Date) antes de salvar
         if (typeof validatedData.date === 'string') {

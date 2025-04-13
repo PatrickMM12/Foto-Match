@@ -230,7 +230,7 @@ const SessionForm: React.FC<SessionFormProps> = ({
             <p className="text-sm font-medium">Valor Total</p>
             <div className="flex items-center text-muted-foreground">
               <DollarSign className="h-4 w-4 mr-2" />
-              <span>R$ {((session?.totalPrice || 0) / 100).toFixed(2).replace('.', ',')}</span>
+              <span>R$ {(session?.totalPrice || 0).toFixed(2).replace('.', ',')}</span>
             </div>
           </div>
           
@@ -325,9 +325,15 @@ const SessionForm: React.FC<SessionFormProps> = ({
                 name="amountPaid"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Valor Pago (em centavos)</FormLabel>
+                    <FormLabel>Valor Pago (R$)</FormLabel>
                     <FormControl>
-                      <Input type="number" min="0" {...field} />
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        step="0.01"
+                        placeholder="0,00"
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

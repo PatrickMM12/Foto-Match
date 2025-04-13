@@ -9,3 +9,6 @@ vite.config.ts.*
 .env
 security-checklist.cursorrules
 README.md
+client/.env.local
+.env.local
+.cursor/mcp.json

@@ -152,7 +152,7 @@ const PhotographerSessions = () => {
   };
   
   const formatCurrency = (amount: number) => {
-    return `R$ ${(amount / 100).toFixed(2).replace('.', ',')}`;
+    return `R$ ${amount.toFixed(2).replace('.', ',')}`;
   };
   
   // Usamos useMemo para calcular as listas filtradas sempre que sessions mudar
@@ -161,18 +161,22 @@ const PhotographerSessions = () => {
   [sessions]);
   
   const upcomingSessions = React.useMemo(() => 
-    sessions?.filter((s: Session) => s.status === 'confirmed' && new Date(s.date) > new Date()) || [],
+    sessions?.filter((s: Session) => s.status === 'confirmed') || [],
   [sessions]);
   
   const pastSessions = React.useMemo(() => 
-    sessions?.filter((s: Session) => 
-      s.status === 'completed' || (s.status === 'confirmed' && new Date(s.date) <= new Date())
-    ) || [],
+    sessions?.filter((s: Session) => s.status === 'completed') || [],
   [sessions]);
   
   const canceledSessions = React.useMemo(() => 
     sessions?.filter((s: Session) => s.status === 'canceled') || [],
   [sessions]);
+  
+  const handleCreateDialogClose = () => {
+    setIsCreateDialogOpen(false);
+    // Forçar um refetch para garantir que os dados estejam atualizados
+    refetch();
+  };
   
   if (isLoading) {
     return <LoadingSpinner />;
@@ -334,13 +338,23 @@ const PhotographerSessions = () => {
         )}
         
         {/* Diálogo para criar nova sessão manualmente */}
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            // Quando o diálogo for fechado, recarregar as sessões
+            refetch();
+          }
+        }}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Criar Nova Sessão</DialogTitle>
             </DialogHeader>
             <CreateSessionForm 
-              onSuccess={() => setIsCreateDialogOpen(false)}
+              onSuccess={() => {
+                setIsCreateDialogOpen(false);
+                // Recarregar as sessões quando uma nova sessão for criada
+                refetch();
+              }}
               onCancel={() => setIsCreateDialogOpen(false)}
             />
           </DialogContent>

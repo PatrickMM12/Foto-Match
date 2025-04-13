@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -30,7 +31,7 @@ const createSessionSchema = z.object({
   totalPrice: z.number().min(0, 'O preço deve ser maior ou igual a zero'),
   duration: z.number().min(1, 'A duração deve ser maior que zero'),
   photosIncluded: z.number().min(0, 'O número de fotos deve ser maior ou igual a zero'),
-  additionalPhotoPrice: z.number().optional(),
+  additionalPhotoPrice: z.number().min(0, 'O preço por foto adicional deve ser maior ou igual a zero'),
   additionalPhotos: z.number().default(0),
 });
 
@@ -51,6 +52,7 @@ interface CreateSessionFormProps {
 
 const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCancel }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [clientSearch, setClientSearch] = useState('');
   const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false);
@@ -106,10 +108,10 @@ const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCanc
   useEffect(() => {
     if (selectedService) {
       form.setValue('title', `Sessão de ${selectedService.name}`);
-      form.setValue('totalPrice', selectedService.price);
+      form.setValue('totalPrice', selectedService.price / 100);
       form.setValue('duration', selectedService.duration);
       form.setValue('photosIncluded', selectedService.maxPhotos || 0);
-      form.setValue('additionalPhotoPrice', selectedService.additionalPhotoPrice || 0);
+      form.setValue('additionalPhotoPrice', (selectedService.additionalPhotoPrice || 0) / 100);
     }
   }, [selectedService, form]);
   
@@ -119,12 +121,25 @@ const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCanc
       const res = await apiRequest('POST', '/api/sessions', data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: 'Sessão criada',
         description: 'A sessão foi criada com sucesso',
       });
+      
+      // Invalidar consulta e forçar a recarga imediata
       queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      
+      // Atualizar o cache manualmente para garantir que a sessão apareça imediatamente
+      queryClient.setQueryData(['/api/sessions'], (oldData: any) => {
+        // Se já existem dados em cache, adicione a nova sessão
+        if (Array.isArray(oldData)) {
+          return [...oldData, data];
+        }
+        // Caso contrário, retorne um array com a nova sessão
+        return [data];
+      });
+      
       onSuccess();
     },
     onError: (error: any) => {
@@ -188,24 +203,36 @@ const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCanc
       return;
     }
     
+    if (!user?.id) {
+      toast({
+        title: 'Erro de autenticação',
+        description: 'Não foi possível identificar o fotógrafo. Tente fazer login novamente.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     // Calcular preço total considerando fotos adicionais
     const basePrice = values.totalPrice;
     const additionalPhotosPrice = values.additionalPhotos * (values.additionalPhotoPrice || 0);
     const calculatedTotalPrice = basePrice + additionalPhotosPrice;
     
+    // Garantir que todos os valores numéricos sejam números
     const sessionData = {
-      clientId: parseInt(values.clientId),
-      serviceId: parseInt(values.serviceId),
+      photographerId: Number(user.id),
+      clientId: Number(values.clientId),
+      serviceId: Number(values.serviceId),
       title: values.title,
       description: values.description || '',
-      date: date.toISOString(), // Enviando como string ISO para compatibilidade com API
-      duration: values.duration,
+      date: date.toISOString(),
+      duration: Number(values.duration),
       location: values.location,
       status: values.status,
-      totalPrice: calculatedTotalPrice,
-      photosIncluded: values.photosIncluded,
+      totalPrice: Number(calculatedTotalPrice),
+      photosIncluded: Number(values.photosIncluded),
       photosDelivered: 0,
-      additionalPhotos: values.additionalPhotos,
+      additionalPhotos: Number(values.additionalPhotos),
+      additionalPhotoPrice: Number(values.additionalPhotoPrice || 0),
       paymentStatus: 'pending',
       amountPaid: 0,
     };
@@ -219,7 +246,7 @@ const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCanc
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-    }).format(value / 100); // Converter centavos para reais
+    }).format(value); // Não converter centavos para reais
   };
 
   // Calcular o valor das fotos adicionais
@@ -324,7 +351,7 @@ const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCanc
                         .filter((service: any) => service.active)
                         .map((service: any) => (
                           <SelectItem key={service.id} value={service.id.toString()}>
-                            {service.name} - {formatCurrency(service.price)}
+                            {service.name} - {formatCurrency(service.price / 100)}
                           </SelectItem>
                         ))
                     )}
@@ -461,8 +488,8 @@ const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCanc
                         type="number" 
                         className="pl-9" 
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value) * 100)}
-                        value={field.value / 100}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        value={field.value}
                       />
                     </div>
                   </FormControl>
@@ -531,8 +558,8 @@ const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCanc
                         type="number" 
                         className="pl-9" 
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value) * 100)}
-                        value={field.value ? field.value / 100 : ''}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        value={field.value}
                       />
                     </div>
                   </FormControl>
