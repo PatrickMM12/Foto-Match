@@ -964,13 +964,32 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
+    console.log("Criando transação com dados:", transaction);
+    
+    // Mapear de camelCase para snake_case
+    const formattedTransaction = {
+      user_id: transaction.userId,
+      session_id: transaction.sessionId,
+      amount: transaction.amount,
+      description: transaction.description,
+      category: transaction.category,
+      date: transaction.date,
+      type: transaction.type
+    };
+    
+    console.log("Dados formatados para inserção:", formattedTransaction);
+    
     const { data, error } = await supabase
       .from('transactions')
-      .insert(transaction)
+      .insert(formattedTransaction)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Erro ao criar transação:", error);
+      throw error;
+    }
+    
     return data as Transaction;
   }
 

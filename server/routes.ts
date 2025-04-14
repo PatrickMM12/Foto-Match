@@ -895,19 +895,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only photographers can access this endpoint" });
       }
       
+      console.log("Received transaction data:", req.body);
+      
+      // Converter a data para objeto Date se for string
+      let transactionData = { ...req.body };
+      if (typeof transactionData.date === 'string') {
+        transactionData.date = new Date(transactionData.date);
+      }
+      
       const validatedData = insertTransactionSchema.parse({
-        ...req.body,
+        ...transactionData,
         userId: user.id,
       });
+      
+      // Garantir que estamos enviando um objeto Date para o banco
+      if (!(validatedData.date instanceof Date)) {
+        validatedData.date = new Date(validatedData.date);
+      }
+      
+      console.log("Validated transaction data:", validatedData);
       
       const transaction = await storage.createTransaction(validatedData);
       res.status(201).json(transaction);
     } catch (error) {
       if (error instanceof ZodError) {
+        console.error("Validation error:", error.errors);
         return res.status(400).json({ message: fromZodError(error).message });
       }
       console.error("Error creating transaction:", error);
-      res.status(500).json({ message: "Error creating transaction" });
+      res.status(500).json({ message: "Error creating transaction", details: error instanceof Error ? error.message : String(error) });
     }
   });
 

@@ -138,9 +138,13 @@ export const insertSessionSchema = z.object({
   amountPaid: z.number().min(0, "Valor pago não pode ser negativo").default(0), // Valor em reais, não centavos
 });
 
-export const insertTransactionSchema = createInsertSchema(transactions).omit({
-  id: true
-});
+export const insertTransactionSchema = createInsertSchema(transactions)
+  .omit({
+    id: true
+  })
+  .extend({
+    date: z.union([z.string(), z.date()]),
+  });
 
 export const insertReviewSchema = createInsertSchema(reviews).omit({
   id: true,
