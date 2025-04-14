@@ -38,10 +38,10 @@ const PhotographerSidebar = () => {
 
   const navItems = [
     { icon: <LayoutDashboard className="h-5 w-5" />, label: 'Dashboard', path: '/photographer/dashboard' },
-    { icon: <User className="h-5 w-5" />, label: 'Perfil', path: '/photographer/profile' },
-    { icon: <Calendar className="h-5 w-5" />, label: 'Agenda', path: '/photographer/calendar' },
     { icon: <Camera className="h-5 w-5" />, label: 'Sessões', path: '/photographer/sessions' },
     { icon: <BarChart className="h-5 w-5" />, label: 'Finanças', path: '/photographer/finances' },
+    { icon: <Calendar className="h-5 w-5" />, label: 'Agenda', path: '/photographer/calendar' },
+    { icon: <User className="h-5 w-5" />, label: 'Perfil', path: '/photographer/profile' },
   ];
 
   // Desktop sidebar
