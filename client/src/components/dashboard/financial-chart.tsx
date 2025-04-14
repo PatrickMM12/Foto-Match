@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
-import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, parseISO } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, startOfYear, endOfYear, eachMonthOfInterval, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,16 @@ interface Transaction {
   type: 'income' | 'expense';
 }
 
+interface Session {
+  id: number;
+  title: string;
+  date: string;
+  amountPaid: number;
+  totalPrice: number;
+  paymentStatus: string;
+  status: string;
+}
+
 interface ChartData {
   date: string;
   income: number;
@@ -26,11 +36,48 @@ interface ChartData {
 
 interface FinancialChartProps {
   transactions: Transaction[];
+  sessions?: Session[];
+  selectedPeriod?: string;
 }
 
-const FinancialChart: React.FC<FinancialChartProps> = ({ transactions }) => {
+const FinancialChart: React.FC<FinancialChartProps> = ({ 
+  transactions,
+  sessions,
+  selectedPeriod 
+}) => {
   const [period, setPeriod] = useState('30days');
   const [chartData, setChartData] = useState<ChartData[]>([]);
+
+  // Mapear os períodos do seletor principal para o formato usado no gráfico
+  const mapSelectedPeriodToChartPeriod = (selectedPeriod?: string): string => {
+    if (!selectedPeriod) return period;
+    
+    switch (selectedPeriod) {
+      case 'this_month':
+        return 'month';
+      case 'last_30_days':
+        return '30days';
+      case 'last_90_days':
+        // Não tem correspondente exato, mantém o padrão
+        return period;
+      case 'this_year':
+        // Não tem correspondente exato, mantém o padrão
+        return period;
+      case 'last_year':
+        // Não tem correspondente exato, mantém o padrão
+        return period;
+      default:
+        return period;
+    }
+  };
+
+  // Usar o período selecionado quando ele mudar
+  useEffect(() => {
+    if (selectedPeriod) {
+      const mappedPeriod = mapSelectedPeriodToChartPeriod(selectedPeriod);
+      setPeriod(mappedPeriod);
+    }
+  }, [selectedPeriod]);
 
   useEffect(() => {
     if (!transactions || transactions.length === 0) {
@@ -41,6 +88,7 @@ const FinancialChart: React.FC<FinancialChartProps> = ({ transactions }) => {
     let startDate, endDate;
     const today = new Date();
 
+    // Definir intervalo com base no período selecionado
     switch (period) {
       case '7days':
         startDate = subDays(today, 7);
@@ -54,19 +102,41 @@ const FinancialChart: React.FC<FinancialChartProps> = ({ transactions }) => {
         startDate = startOfMonth(today);
         endDate = endOfMonth(today);
         break;
+      case 'year':
+        startDate = startOfYear(today);
+        endDate = endOfYear(today);
+        break;
+      case 'last_year':
+        startDate = startOfYear(subYears(today, 1));
+        endDate = endOfYear(subYears(today, 1));
+        break;
+      case '90days':
+        startDate = subDays(today, 90);
+        endDate = today;
+        break;
       default:
         startDate = subDays(today, 30);
         endDate = today;
     }
 
-    // Create array of all days in the range
-    const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
+    // Criar intervalo de datas apropriado
+    let dateRange;
+    let dateFormat: string;
     
-    // Initialize data with zero values for all dates
+    // Para períodos longos, agrupar por mês em vez de dia
+    if (period === 'year' || period === 'last_year') {
+      dateRange = eachMonthOfInterval({ start: startDate, end: endDate });
+      dateFormat = 'MMM';
+    } else {
+      dateRange = eachDayOfInterval({ start: startDate, end: endDate });
+      dateFormat = 'dd/MM';
+    }
+    
+    // Inicializar dados com valores zero para todas as datas
     const initialData = dateRange.map(date => {
       const dateString = format(date, 'yyyy-MM-dd');
       return {
-        date: format(date, 'dd/MM', { locale: ptBR }),
+        date: format(date, dateFormat, { locale: ptBR }),
         dateString,
         income: 0,
         expense: 0,
@@ -74,27 +144,85 @@ const FinancialChart: React.FC<FinancialChartProps> = ({ transactions }) => {
       };
     });
 
-    // Aggregate transaction data by date
+    // Filtrar e agregar dados de transações por data
     transactions.forEach(transaction => {
-      // Skip transactions outside the date range
       const txDate = parseISO(transaction.date);
+      
+      // Pular transações fora do intervalo de datas
       if (txDate < startDate || txDate > endDate) return;
       
-      const dateString = format(txDate, 'yyyy-MM-dd');
-      const dataPoint = initialData.find(item => item.dateString === dateString);
+      let targetDateString;
+      
+      // Para agrupamento por mês
+      if (period === 'year' || period === 'last_year') {
+        targetDateString = format(txDate, 'yyyy-MM-01');
+      } else {
+        targetDateString = format(txDate, 'yyyy-MM-dd');
+      }
+      
+      const dataPoint = initialData.find(item => {
+        if (period === 'year' || period === 'last_year') {
+          // Comparar apenas mês e ano para agrupamento mensal
+          return item.dateString.substring(0, 7) === targetDateString.substring(0, 7);
+        }
+        return item.dateString === targetDateString;
+      });
       
       if (dataPoint) {
         if (transaction.type === 'income') {
-          dataPoint.income += transaction.amount / 100;
+          dataPoint.income += transaction.amount;
         } else {
-          dataPoint.expense += Math.abs(transaction.amount) / 100;
+          dataPoint.expense += Math.abs(transaction.amount);
         }
         dataPoint.balance = dataPoint.income - dataPoint.expense;
       }
     });
+    
+    // Adicionar receitas de sessões ao gráfico (se houver)
+    if (sessions && sessions.length > 0) {
+      // Mapear sessionIds de transações existentes para evitar duplicidade
+      const sessionIdsWithTransactions = transactions
+        .filter(t => t.type === 'income' && t.sessionId)
+        .map(t => t.sessionId);
+
+      sessions.forEach(session => {
+        // Apenas considerar sessões com pagamentos e que não possuem transações associadas
+        if (session.amountPaid <= 0 || sessionIdsWithTransactions.includes(session.id)) {
+          return;
+        }
+
+        const sessionDate = parseISO(session.date);
+        
+        // Pular sessões fora do intervalo de datas
+        if (sessionDate < startDate || sessionDate > endDate) return;
+        
+        let targetDateString;
+        
+        // Para agrupamento por mês
+        if (period === 'year' || period === 'last_year') {
+          targetDateString = format(sessionDate, 'yyyy-MM-01');
+        } else {
+          targetDateString = format(sessionDate, 'yyyy-MM-dd');
+        }
+        
+        const dataPoint = initialData.find(item => {
+          if (period === 'year' || period === 'last_year') {
+            // Comparar apenas mês e ano para agrupamento mensal
+            return item.dateString.substring(0, 7) === targetDateString.substring(0, 7);
+          }
+          return item.dateString === targetDateString;
+        });
+        
+        if (dataPoint) {
+          // Adicionar o valor pago como receita
+          dataPoint.income += session.amountPaid;
+          dataPoint.balance = dataPoint.income - dataPoint.expense;
+        }
+      });
+    }
 
     setChartData(initialData);
-  }, [transactions, period]);
+  }, [transactions, sessions, period]);
 
   // Custom tooltip for the chart
   const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
@@ -128,7 +256,10 @@ const FinancialChart: React.FC<FinancialChartProps> = ({ transactions }) => {
           <SelectContent>
             <SelectItem value="7days">Últimos 7 dias</SelectItem>
             <SelectItem value="30days">Últimos 30 dias</SelectItem>
+            <SelectItem value="90days">Últimos 90 dias</SelectItem>
             <SelectItem value="month">Este mês</SelectItem>
+            <SelectItem value="year">Este ano</SelectItem>
+            <SelectItem value="last_year">Ano passado</SelectItem>
           </SelectContent>
         </Select>
       </CardHeader>
