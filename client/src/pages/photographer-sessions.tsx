@@ -275,17 +275,17 @@ const PhotographerSessions = () => {
                             </div>
                           </div>
                         </CardContent>
-                        <CardFooter className="flex justify-between">
-                          <Button variant="outline" onClick={() => handleViewSession(session)}>
+                        <CardFooter className="flex flex-col gap-2">
+                          <Button variant="outline" onClick={() => handleViewSession(session)} className="w-full">
                             Detalhes
                           </Button>
                           
                           {session.status === 'pending' && (
-                            <div className="flex space-x-2">
+                            <div className="flex flex-wrap gap-2 w-full">
                               <Button 
                                 size="sm" 
                                 variant="outline" 
-                                className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:text-green-800"
+                                className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:text-green-800 flex-1 min-w-[140px]"
                                 onClick={() => handleUpdateStatus(session.id, 'confirmed')}
                               >
                                 <CheckCircle className="h-4 w-4 mr-1" />
@@ -294,7 +294,7 @@ const PhotographerSessions = () => {
                               <Button 
                                 size="sm" 
                                 variant="outline" 
-                                className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:text-red-800"
+                                className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:text-red-800 flex-1 min-w-[140px]"
                                 onClick={() => handleUpdateStatus(session.id, 'canceled')}
                               >
                                 <XCircle className="h-4 w-4 mr-1" />
@@ -305,7 +305,8 @@ const PhotographerSessions = () => {
                           
                           {session.status === 'confirmed' && (
                             <Button 
-                              size="sm" 
+                              size="sm"
+                              className="w-full"
                               onClick={() => handleUpdateStatus(session.id, 'completed')}
                             >
                               Concluir

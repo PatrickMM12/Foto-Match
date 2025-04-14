@@ -12,19 +12,42 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calendar, MapPin, Clock, DollarSign, User, Star } from 'lucide-react';
 
+// Definir a interface da sessão para evitar erros de tipagem
+interface Session {
+  id: number;
+  title: string;
+  description?: string;
+  date: string;
+  duration: number;
+  location: string;
+  status: string;
+  totalPrice: number;
+  photosIncluded: number;
+  photosDelivered: number;
+  additionalPhotos: number;
+  additionalPhotoPrice: number;
+  paymentStatus: string;
+  amountPaid: number;
+  clientId: number;
+  photographerId: number;
+  photographerName?: string;
+  serviceId: number;
+  createdAt: string;
+}
+
 const ClientBookings = () => {
-  const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   
-  const { data: sessions, isLoading } = useQuery({
+  const { data: sessions, isLoading } = useQuery<Session[]>({
     queryKey: ['/api/sessions'],
   });
   
-  const handleViewSession = (session: any) => {
+  const handleViewSession = (session: Session) => {
     setSelectedSession(session);
   };
   
-  const handleOpenReview = (session: any) => {
+  const handleOpenReview = (session: Session) => {
     setSelectedSession(session);
     setIsReviewDialogOpen(true);
   };
@@ -70,17 +93,17 @@ const ClientBookings = () => {
     return <LoadingSpinner />;
   }
   
-  const upcomingSessions = sessions?.filter(s => 
+  const upcomingSessions = sessions?.filter((s: Session) => 
     (s.status === 'confirmed' || s.status === 'pending') && 
     new Date(s.date) > new Date()
   ) || [];
   
-  const pastSessions = sessions?.filter(s => 
+  const pastSessions = sessions?.filter((s: Session) => 
     s.status === 'completed' || 
     (s.status === 'confirmed' && new Date(s.date) <= new Date())
   ) || [];
   
-  const canceledSessions = sessions?.filter(s => s.status === 'canceled') || [];
+  const canceledSessions = sessions?.filter((s: Session) => s.status === 'canceled') || [];
   
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -102,7 +125,7 @@ const ClientBookings = () => {
           </TabsList>
           
           {(['upcoming', 'past', 'canceled'] as const).map(tabValue => {
-            let sessionsToShow;
+            let sessionsToShow: Session[] = [];
             
             switch (tabValue) {
               case 'upcoming':
@@ -128,7 +151,7 @@ const ClientBookings = () => {
                   </Card>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {sessionsToShow.map((session) => (
+                    {sessionsToShow.map((session: Session) => (
                       <Card key={session.id}>
                         <CardHeader>
                           <div className="flex justify-between items-start">
@@ -162,36 +185,39 @@ const ClientBookings = () => {
                             </div>
                           </div>
                         </CardContent>
-                        <CardFooter className="flex justify-between">
-                          <Button variant="outline" onClick={() => handleViewSession(session)}>
+                        <CardFooter className="flex flex-col gap-2">
+                          <Button variant="outline" onClick={() => handleViewSession(session)} className="w-full">
                             Detalhes
                           </Button>
                           
-                          {session.status === 'completed' && (
-                            <Button 
-                              variant="outline"
-                              onClick={() => handleOpenReview(session)}
-                            >
-                              <Star className="h-4 w-4 mr-1" />
-                              Avaliar
-                            </Button>
-                          )}
-                          
-                          {session.status === 'pending' && (
-                            <Button 
-                              variant="outline" 
-                              className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:text-red-800"
-                            >
-                              Cancelar
-                            </Button>
-                          )}
-                          
-                          {session.paymentStatus !== 'paid' && session.status !== 'canceled' && (
-                            <Button>
-                              <DollarSign className="h-4 w-4 mr-1" />
-                              Pagar
-                            </Button>
-                          )}
+                          <div className="flex flex-wrap gap-2 w-full">
+                            {session.status === 'completed' && (
+                              <Button 
+                                variant="outline"
+                                className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800 flex-1 min-w-[140px]"
+                                onClick={() => handleOpenReview(session)}
+                              >
+                                <Star className="h-4 w-4 mr-1" />
+                                Avaliar
+                              </Button>
+                            )}
+                            
+                            {session.status === 'pending' && (
+                              <Button 
+                                variant="outline" 
+                                className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:text-red-800 flex-1 min-w-[140px]"
+                              >
+                                Cancelar
+                              </Button>
+                            )}
+                            
+                            {session.paymentStatus !== 'paid' && session.status !== 'canceled' && (
+                              <Button className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100 hover:text-green-800 flex-1 min-w-[140px]">
+                                <DollarSign className="h-4 w-4 mr-1" />
+                                Pagar
+                              </Button>
+                            )}
+                          </div>
                         </CardFooter>
                       </Card>
                     ))}
