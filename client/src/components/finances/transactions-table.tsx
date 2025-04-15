@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { ArrowUpDown, Edit, Trash } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowUpDown } from 'lucide-react';
 import { 
   Card, 
   CardContent, 
@@ -65,8 +66,10 @@ export default function TransactionsTable({
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof Transaction;
+    key: keyof Transaction | null;
     direction: 'asc' | 'desc';
   }>({ key: 'date', direction: 'desc' });
 
@@ -90,10 +93,10 @@ export default function TransactionsTable({
 
   // Ordenação de transações
   const requestSort = (key: keyof Transaction) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
+    const direction: 'asc' | 'desc' = 
+      sortConfig.key === key && sortConfig.direction === 'asc' 
+        ? 'desc' 
+        : 'asc';
     setSortConfig({ key, direction });
   };
 
@@ -107,7 +110,7 @@ export default function TransactionsTable({
       filtered = filtered.filter(
         transaction =>
           transaction.description.toLowerCase().includes(searchLower) ||
-          transaction.notes?.toLowerCase().includes(searchLower)
+          (transaction.notes?.toLowerCase() || '').includes(searchLower)
       );
     }
 
@@ -122,19 +125,36 @@ export default function TransactionsTable({
     }
 
     // Ordenar
-    return filtered.sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
+    if (sortConfig.key) {
+      filtered.sort((a, b) => {
+        const aValue = a[sortConfig.key as keyof Transaction];
+        const bValue = b[sortConfig.key as keyof Transaction];
 
-      if (aValue < bValue) {
-        return sortConfig.direction === 'asc' ? -1 : 1;
-      }
-      if (aValue > bValue) {
-        return sortConfig.direction === 'asc' ? 1 : -1;
-      }
-      return 0;
-    });
+        // Tratamento para valores indefinidos
+        if (aValue === undefined && bValue === undefined) return 0;
+        if (aValue === undefined) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (bValue === undefined) return sortConfig.direction === 'asc' ? 1 : -1;
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    
+    return filtered;
   }, [transactions, search, filterType, filterCategory, sortConfig]);
+
+  // Paginação
+  const totalPages = Math.ceil(filteredAndSortedTransactions.length / itemsPerPage);
+  const paginatedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredAndSortedTransactions.slice(start, end);
+  }, [filteredAndSortedTransactions, currentPage, itemsPerPage]);
 
   // Verificar se não há transações para exibir
   const noTransactions = filteredAndSortedTransactions.length === 0;
@@ -229,7 +249,7 @@ export default function TransactionsTable({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredAndSortedTransactions.map((transaction) => (
+                  paginatedTransactions.map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell className="whitespace-nowrap">
                         {formatDate(transaction.date)}
@@ -250,25 +270,54 @@ export default function TransactionsTable({
                       </TableCell>
                       {(onEdit || onDelete) && (
                         <TableCell>
-                          <div className="flex justify-end gap-2">
+                          <div className="flex items-center justify-end gap-2">
                             {onEdit && (
                               <Button
                                 variant="ghost"
-                                size="icon"
+                                size="sm"
                                 onClick={() => onEdit(transaction)}
+                                className="h-8 w-8 p-0"
                               >
-                                <Edit className="h-4 w-4" />
                                 <span className="sr-only">Editar</span>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="h-4 w-4"
+                                >
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
                               </Button>
                             )}
                             {onDelete && (
                               <Button
                                 variant="ghost"
-                                size="icon"
+                                size="sm"
                                 onClick={() => onDelete(transaction.id)}
+                                className="h-8 w-8 p-0"
                               >
-                                <Trash className="h-4 w-4" />
                                 <span className="sr-only">Excluir</span>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="h-4 w-4"
+                                >
+                                  <path d="M3 6h18" />
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                  <line x1="10" y1="11" x2="10" y2="17" />
+                                  <line x1="14" y1="11" x2="14" y2="17" />
+                                </svg>
                               </Button>
                             )}
                           </div>
@@ -280,218 +329,59 @@ export default function TransactionsTable({
               </TableBody>
             </Table>
           </div>
-        </div>
-  // Função para ordenar transações
-  const sortedTransactions = React.useMemo(() => {
-    let sortableTransactions = [...transactions];
-    
-    if (sortConfig.key !== null) {
-      sortableTransactions.sort((a, b) => {
-        if (a[sortConfig.key!] < b[sortConfig.key!]) {
-          return sortConfig.direction === 'ascending' ? -1 : 1;
-        }
-        if (a[sortConfig.key!] > b[sortConfig.key!]) {
-          return sortConfig.direction === 'ascending' ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-    return sortableTransactions;
-  }, [transactions, sortConfig]);
-
-  // Função para solicitar ordenação
-  const requestSort = (key: keyof Transaction) => {
-    let direction: 'ascending' | 'descending' = 'ascending';
-    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  // Filtrar transações
-  const filteredTransactions = React.useMemo(() => {
-    return sortedTransactions.filter(transaction => {
-      // Filtro por tipo
-      const typeMatch = filterType === 'all' || transaction.type === filterType;
-      
-      // Filtro por categoria
-      const categoryMatch = filterCategory === 'all' || transaction.category === filterCategory;
-      
-      // Filtro por termo de busca
-      const searchMatch = 
-        transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        transaction.category.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      return typeMatch && categoryMatch && searchMatch;
-    });
-  }, [sortedTransactions, filterType, filterCategory, searchTerm]);
-
-  // Extrair categorias únicas para o filtro
-  const uniqueCategories = React.useMemo(() => {
-    const categories = new Set<string>();
-    transactions.forEach(t => categories.add(t.category));
-    return Array.from(categories).sort();
-  }, [transactions]);
-
-  // Paginação
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-  const paginatedTransactions = React.useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    const end = start + itemsPerPage;
-    return filteredTransactions.slice(start, end);
-  }, [filteredTransactions, currentPage, itemsPerPage]);
-
-  // Renderizar páginas
-  const renderPagination = () => {
-    const pages = [];
-    for (let i = 1; i <= totalPages; i++) {
-      pages.push(
-        <PaginationItem key={i}>
-          <PaginationLink
-            onClick={() => setCurrentPage(i)}
-            isActive={currentPage === i}
-          >
-            {i}
-          </PaginationLink>
-        </PaginationItem>
-      );
-    }
-    return pages;
-  };
-
-  // Cabeçalho da tabela com capacidade de ordenação
-  const renderHeaderCell = (key: keyof Transaction, label: string) => {
-    return (
-      <TableHead 
-        className="cursor-pointer hover:bg-muted/50" 
-        onClick={() => requestSort(key)}
-      >
-        <div className="flex items-center space-x-1">
-          <span>{label}</span>
-          {sortConfig.key === key && (
-            <span>{sortConfig.direction === 'ascending' ? '↑' : '↓'}</span>
+          
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center space-x-2 py-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Anterior
+              </Button>
+              {Array.from({ length: Math.min(totalPages, 5) }).map((_, i) => {
+                let pageNumber = i + 1;
+                
+                // Se houver muitas páginas, mostrar apenas algumas
+                if (totalPages > 5) {
+                  if (currentPage > 3 && i < 2) {
+                    pageNumber = i === 0 ? 1 : Math.floor(currentPage / 2);
+                  } else if (currentPage > 3 && i >= 2) {
+                    pageNumber = i === 2 ? currentPage : (i === 3 ? currentPage + 1 : totalPages);
+                  }
+                }
+                
+                return (
+                  <Button
+                    key={i}
+                    variant={currentPage === pageNumber ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNumber)}
+                  >
+                    {pageNumber}
+                  </Button>
+                );
+              })}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Próximo
+              </Button>
+            </div>
+          )}
+          
+          {!noTransactions && (
+            <div className="text-sm text-center text-muted-foreground">
+              Exibindo {paginatedTransactions.length} de {filteredAndSortedTransactions.length} transações
+            </div>
           )}
         </div>
-      </TableHead>
-    );
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-        <div className="flex-1">
-          <Input
-            placeholder="Buscar transações..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
-          />
-        </div>
-        <div className="flex gap-4">
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrar por tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os tipos</SelectItem>
-              <SelectItem value="income">Receitas</SelectItem>
-              <SelectItem value="expense">Despesas</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrar por categoria" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as categorias</SelectItem>
-              {uniqueCategories.map(category => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="border rounded-md">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px]">Data</TableHead>
-              {renderHeaderCell('description', 'Descrição')}
-              {renderHeaderCell('category', 'Categoria')}
-              {renderHeaderCell('type', 'Tipo')}
-              {renderHeaderCell('amount', 'Valor')}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedTransactions.length > 0 ? (
-              paginatedTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell className="font-medium">
-                    {formatDate(transaction.date)}
-                  </TableCell>
-                  <TableCell>{transaction.description}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{transaction.category}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={transaction.type === 'income' ? 'default' : 'destructive'}
-                      className={transaction.type === 'income' ? 'bg-green-100 text-green-800 hover:bg-green-100' : 'bg-red-100 text-red-800 hover:bg-red-100'}
-                    >
-                      {transaction.type === 'income' ? 'Receita' : 'Despesa'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell 
-                    className={`font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}
-                  >
-                    {transaction.type === 'income' ? '+' : '-'} {formatCurrency(Math.abs(transaction.amount))}
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                  Nenhuma transação encontrada para os filtros selecionados.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {totalPages > 1 && (
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                aria-disabled={currentPage === 1}
-                className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
-              />
-            </PaginationItem>
-            
-            {renderPagination()}
-            
-            <PaginationItem>
-              <PaginationNext
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                aria-disabled={currentPage === totalPages}
-                className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      )}
-      
-      <div className="text-sm text-muted-foreground">
-        Exibindo {paginatedTransactions.length} de {filteredTransactions.length} transações
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
-};
-
-export default TransactionsTable; 
+} 

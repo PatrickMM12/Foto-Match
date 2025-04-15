@@ -11,6 +11,12 @@ import LoadingSpinner from '@/components/shared/loading-spinner';
 import TransactionForm from '@/components/finances/transaction-form';
 import TransactionList from '@/components/finances/transaction-list';
 import FinancialChart from '@/components/dashboard/financial-chart';
+import {
+  ExpenseCategoryChart,
+  TrendAnalysisChart, 
+  PerformanceComparison,
+  FinancialProjection
+} from '@/components/finances';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -770,25 +776,34 @@ const PhotographerFinances = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Comparação de Desempenho */}
+                <PerformanceComparison 
+                  transactions={filteredTransactions} 
+                  sessions={filteredSessions as any} 
+                />
+                
+                {/* Análise de Tendências */}
+                <div className="mt-8">
+                  <h3 className="text-base font-medium mb-4">Análise de Tendências</h3>
+                  <Card>
+                    <CardContent className="p-6">
+                      <TrendAnalysisChart 
+                        transactions={transactions || []} 
+                        sessions={sessions || []} 
+                        months={12}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                {/* Gráficos de Análise */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Desempenho Mensal</CardTitle>
+                      <CardTitle className="text-base">Despesas por Categoria</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-[250px]">
-                        {transactions?.length === 0 ? (
-                          <div className="flex justify-center items-center h-full">
-                            <p className="text-muted-foreground text-sm">Sem dados suficientes</p>
-                          </div>
-                        ) : (
-                          <FinancialChart 
-                            transactions={transactions || []} 
-                            sessions={sessions || []}
-                            selectedPeriod={selectedTimePeriod}
-                          />
-                        )}
-                      </div>
+                      <ExpenseCategoryChart transactions={filteredTransactions} />
                     </CardContent>
                   </Card>
                   
@@ -824,6 +839,15 @@ const PhotographerFinances = () => {
                   </Card>
                 </div>
                 
+                {/* Projeção Financeira */}
+                <div className="mt-8">
+                  <FinancialProjection 
+                    transactions={transactions || []} 
+                    sessions={sessions || []} 
+                  />
+                </div>
+                
+                {/* Detalhamento de Receitas */}
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Detalhamento de Receitas</CardTitle>
@@ -869,26 +893,6 @@ const PhotographerFinances = () => {
                         </p>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Categorias de Despesas</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {transactions?.filter(t => t.type === 'expense').length === 0 ? (
-                      <div className="flex justify-center items-center h-[100px]">
-                        <p className="text-muted-foreground text-sm">Sem dados de despesas</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {/* Aqui poderia ser implementado um gráfico de pizza por categoria */}
-                        <p className="text-muted-foreground text-sm text-center">
-                          Implementação futura: Gráfico de distribuição de despesas por categoria
-                        </p>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               </CardContent>
