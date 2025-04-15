@@ -6,6 +6,9 @@ interface StatsOverviewProps {
   previousMonthIncome: number;
   upcomingSessions: number;
   averageRating: number;
+  reviewCount: number;
+  conversionRate: number;
+  totalRequests: number;
 }
 
 const StatsOverview: React.FC<StatsOverviewProps> = ({
@@ -13,6 +16,9 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   previousMonthIncome,
   upcomingSessions,
   averageRating,
+  reviewCount,
+  conversionRate,
+  totalRequests,
 }) => {
   const incomeChange = monthlyIncome - previousMonthIncome;
   const percentChange = previousMonthIncome > 0 
@@ -23,11 +29,18 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-    }).format(amount / 100);
+    }).format(amount);
   };
 
   // Function to render stars based on rating
   const renderStars = (rating: number) => {
+    // Se não houver avaliações, não mostrar estrelas
+    if (rating === 0) {
+      return Array(5).fill(0).map((_, i) => (
+        <Star key={`empty-${i}`} className="h-4 w-4 text-gray-300" />
+      ));
+    }
+    
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 !== 0;
@@ -111,9 +124,11 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
         <CardContent className="p-6">
           <div className="flex justify-between items-start mb-3">
             <p className="text-muted-foreground font-medium">Avaliação Média</p>
-            <span className="text-yellow-700 bg-yellow-100 text-xs font-medium px-2 py-1 rounded">
-              18 novas
-            </span>
+            {reviewCount > 0 && (
+              <span className="text-yellow-700 bg-yellow-100 text-xs font-medium px-2 py-1 rounded">
+                {reviewCount} {reviewCount === 1 ? 'avaliação' : 'avaliações'}
+              </span>
+            )}
           </div>
           <div className="flex items-center">
             <p className="text-2xl font-bold text-gray-900 mr-2">{averageRating.toFixed(1)}</p>
@@ -121,21 +136,29 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
               {renderStars(averageRating)}
             </div>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">baseado em 42 avaliações</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {reviewCount > 0 
+              ? `baseado em ${reviewCount} ${reviewCount === 1 ? 'avaliação' : 'avaliações'}`
+              : 'sem avaliações ainda'}
+          </p>
         </CardContent>
       </Card>
 
-      {/* Placeholder for a fourth card */}
+      {/* Conversion Rate Card */}
       <Card>
         <CardContent className="p-6">
           <div className="flex justify-between items-start mb-3">
             <p className="text-muted-foreground font-medium">Taxa de Conversão</p>
-            <span className="text-blue-700 bg-blue-100 text-xs font-medium px-2 py-1 rounded">
-              +5%
-            </span>
+            {totalRequests > 0 && (
+              <span className="text-blue-700 bg-blue-100 text-xs font-medium px-2 py-1 rounded">
+                {totalRequests} {totalRequests === 1 ? 'solicitação' : 'solicitações'}
+              </span>
+            )}
           </div>
-          <p className="text-2xl font-bold text-gray-900">68%</p>
-          <p className="text-sm text-muted-foreground mt-1">de solicitações aceitas</p>
+          <p className="text-2xl font-bold text-gray-900">{conversionRate.toFixed(0)}%</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            de solicitações aceitas
+          </p>
         </CardContent>
       </Card>
     </div>
