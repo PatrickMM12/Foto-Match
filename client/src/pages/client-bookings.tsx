@@ -4,6 +4,7 @@ import ClientSidebar from '@/components/layout/client-sidebar';
 import PageTitle from '@/components/shared/page-title';
 import LoadingSpinner from '@/components/shared/loading-spinner';
 import ReviewForm from '@/components/client/review-form';
+import SessionDetailModal from '@/components/client/session-detail-modal';
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -38,6 +39,7 @@ interface Session {
 const ClientBookings = () => {
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   
   const { data: sessions, isLoading } = useQuery<Session[]>({
     queryKey: ['/api/sessions'],
@@ -45,6 +47,7 @@ const ClientBookings = () => {
   
   const handleViewSession = (session: Session) => {
     setSelectedSession(session);
+    setIsDetailModalOpen(true);
   };
   
   const handleOpenReview = (session: Session) => {
@@ -82,10 +85,14 @@ const ClientBookings = () => {
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR');
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
   
   const formatCurrency = (amount: number) => {
+    if (typeof amount !== 'number' || isNaN(amount)) {
+        console.warn("formatCurrency recebeu um valor inválido:", amount);
+        return 'R$ --,--';
+    }
     return `R$ ${(amount / 100).toFixed(2).replace('.', ',')}`;
   };
   
@@ -198,7 +205,7 @@ const ClientBookings = () => {
                                 onClick={() => handleOpenReview(session)}
                               >
                                 <Star className="h-4 w-4 mr-1" />
-                                Avaliar
+                                Avaliar Fotógrafo
                               </Button>
                             )}
                             
@@ -228,17 +235,29 @@ const ClientBookings = () => {
           })}
         </Tabs>
         
-        {/* Review Dialog */}
+        {/* Modal de Detalhes da Sessão */}
+        {selectedSession && (
+          <SessionDetailModal
+            session={selectedSession}
+            isOpen={isDetailModalOpen}
+            onClose={() => setIsDetailModalOpen(false)}
+          />
+        )}
+
+        {/* Modal de Avaliação */}
         {selectedSession && (
           <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Avaliar Sessão</DialogTitle>
+                <DialogTitle>Avaliar Sessão: {selectedSession.title}</DialogTitle>
               </DialogHeader>
-              <ReviewForm 
+              <ReviewForm
                 sessionId={selectedSession.id}
                 photographerId={selectedSession.photographerId}
-                onReviewSubmitted={() => setIsReviewDialogOpen(false)}
+                onReviewSubmitted={() => {
+                  setIsReviewDialogOpen(false);
+                  setSelectedSession(null);
+                }}
               />
             </DialogContent>
           </Dialog>
