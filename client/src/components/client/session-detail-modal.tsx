@@ -153,13 +153,21 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, isOpen
             <span className="text-muted-foreground mr-2">Fotos Entregues:</span>
             <span>{session.photosDelivered}</span>
           </div>
-          {session.additionalPhotos > 0 && (
-             <div className="flex items-center">
-                 <Camera className="h-4 w-4 mr-2 text-muted-foreground" />
-                 <span className="text-muted-foreground mr-2">Fotos Adicionais:</span>
-                 <span>{session.additionalPhotos} (Custo: {formatCurrency(session.additionalPhotoPrice)} cada)</span>
-             </div>
-           )}
+          {session.additionalPhotos > 0 && (() => {
+             // Calcular o custo total das fotos adicionais ANTES de retornar o JSX
+             const totalAdditionalCostInCents = session.additionalPhotos * (session.additionalPhotoPrice || 0);
+             return (
+               <div className="flex items-center">
+                   <Camera className="h-4 w-4 mr-2 text-muted-foreground" />
+                   <span className="text-muted-foreground mr-2">Fotos Adicionais:</span>
+                   {/* Exibir quantidade, custo total e custo unitário */}
+                   <span>
+                     {session.additionalPhotos} (Custo Total: {formatCurrency(totalAdditionalCostInCents)}) 
+                     <span className="text-xs text-muted-foreground ml-1">({formatCurrency(session.additionalPhotoPrice)} cada)</span>
+                   </span>
+               </div>
+             );
+           })()}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Fechar</Button>
