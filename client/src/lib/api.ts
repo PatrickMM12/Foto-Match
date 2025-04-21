@@ -29,22 +29,22 @@ export const getPhotographerById = async (id: number) => {
 
 // Services APIs
 export const getServices = async () => {
-  const res = await apiRequest('GET', '/api/services', undefined);
+  const res = await apiRequest('GET', '/api/photographers/services', undefined);
   return await res.json();
 };
 
 export const createService = async (data: any) => {
-  const res = await apiRequest('POST', '/api/services', data);
+  const res = await apiRequest('POST', '/api/photographers/services', data);
   return await res.json();
 };
 
 export const updateService = async (id: number, data: any) => {
-  const res = await apiRequest('PATCH', `/api/services/${id}`, data);
+  const res = await apiRequest('PATCH', `/api/photographers/services/${id}`, data);
   return await res.json();
 };
 
 export const deleteService = async (id: number) => {
-  await apiRequest('DELETE', `/api/services/${id}`, undefined);
+  await apiRequest('DELETE', `/api/photographers/services/${id}`, undefined);
   return true;
 };
 
@@ -106,10 +106,52 @@ export const deletePortfolioItem = async (id: number) => {
   return true;
 };
 
+// Definições de tipos
+interface Review {
+  id: number;
+  photographerId: number;
+  reviewerId: number;
+  sessionId?: number;
+  rating: number;
+  qualityRating?: number;
+  professionalismRating?: number;
+  comment: string;
+  createdAt: string;
+}
+
 // Reviews APIs
 export const getPhotographerReviews = async (photographerId: number) => {
-  const res = await apiRequest('GET', `/api/reviews/photographer/${photographerId}`, undefined);
-  return await res.json();
+  try {
+    const res = await apiRequest('GET', `/api/reviews/photographer/${photographerId}`, undefined);
+    
+    if (!res.ok) {
+      console.error(`Erro ao buscar avaliações: ${res.status} ${res.statusText}`);
+      return [];
+    }
+    
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Erro ao processar avaliações:', error);
+    return [];
+  }
+};
+
+export const getMyReviews = async (): Promise<Review[]> => {
+  try {
+    const res = await apiRequest('GET', '/api/reviews/me/photographer', undefined);
+    
+    if (!res.ok) {
+      console.error(`Erro ao buscar minhas avaliações: ${res.status} ${res.statusText}`);
+      return [];
+    }
+    
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Erro ao buscar minhas avaliações:', error);
+    return [];
+  }
 };
 
 export const createReview = async (data: any) => {

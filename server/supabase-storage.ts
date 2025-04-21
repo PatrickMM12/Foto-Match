@@ -1016,13 +1016,99 @@ export class SupabaseStorage implements IStorage {
 
   // Reviews
   async getReviews(photographerId: number): Promise<Review[]> {
-    const { data, error } = await supabase
-      .from('reviews')
-      .select('*')
-      .eq('user_id', photographerId);
+    console.log(`[SupabaseStorage.getReviews] Iniciando busca para photographerId=${photographerId} (Tipo: ${typeof photographerId})`);
     
-    if (error || !data) return [];
-    return data as Review[];
+    // Validar se o ID é um número válido
+    if (isNaN(photographerId) || photographerId <= 0) {
+      console.error(`[SupabaseStorage.getReviews] ID de fotógrafo inválido fornecido: ${photographerId}`);
+      return []; // Retornar array vazio em vez de lançar erro
+    }
+    
+    try {
+      console.log(`[SupabaseStorage.getReviews] Executando consulta Supabase: from('reviews').select('*').eq('photographer_id', ${photographerId})`);
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('photographer_id', photographerId);
+      
+      if (error) {
+        console.error(`[SupabaseStorage.getReviews] Erro retornado pelo Supabase:`, JSON.stringify(error, null, 2));
+        return []; // Retornar array vazio em vez de lançar erro
+      }
+      
+      console.log(`[SupabaseStorage.getReviews] Consulta Supabase concluída. Número de reviews brutas encontradas: ${data?.length || 0}`);
+      
+      // Log dos dados brutos (se houver)
+      if (data && data.length > 0) {
+        console.log(`[SupabaseStorage.getReviews] Dados brutos recebidos do Supabase (primeira review):`, JSON.stringify(data[0], null, 2));
+      } else {
+        console.log(`[SupabaseStorage.getReviews] Nenhum dado bruto recebido do Supabase.`);
+      }
+      
+      // Converter de snake_case para camelCase
+      const mappedReviews = (data || []).map(review => ({
+        id: review.id,
+        sessionId: review.session_id,
+        reviewerId: review.reviewer_id,
+        photographerId: review.photographer_id, // Manter este campo para verificação
+        rating: review.rating,
+        qualityRating: review.quality_rating,
+        professionalismRating: review.professionalism_rating,
+        comment: review.comment,
+        createdAt: review.created_at
+      }));
+
+      console.log(`[SupabaseStorage.getReviews] Mapeamento concluído. Número de reviews mapeadas: ${mappedReviews.length}`);
+      if (mappedReviews.length > 0) {
+         console.log(`[SupabaseStorage.getReviews] Primeira review mapeada:`, JSON.stringify(mappedReviews[0], null, 2));
+      }
+
+      return mappedReviews;
+    } catch (catchError) {
+      console.error(`[SupabaseStorage.getReviews] Erro inesperado capturado no bloco catch:`, catchError);
+      return []; // Retornar array vazio em vez de lançar erro
+    }
+  }
+
+  async getReviewsByUserId(userId: number): Promise<Review[]> {
+    // Validar se o ID é um número válido
+    if (isNaN(userId) || userId <= 0) {
+      console.error(`ID de usuário inválido fornecido: ${userId}`);
+      return []; // Retornar array vazio em vez de lançar erro
+    }
+    
+    try {
+      // Buscar usando photographer_id
+      const { data: data1, error: error1 } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('photographer_id', userId);
+      
+      if (error1) {
+        console.error(`Erro ao buscar avaliações por photographer_id:`, error1);
+      }
+      
+      // Usar o resultado que encontrou reviews, ou um array vazio se nenhum encontrou
+      const reviews = (data1 && data1.length > 0) ? data1 : [];
+      
+      // Converter de snake_case para camelCase
+      const mappedReviews = reviews.map(review => ({
+        id: review.id,
+        sessionId: review.session_id,
+        reviewerId: review.reviewer_id,
+        photographerId: review.photographer_id || review.user_id, // Usar qualquer um que estiver disponível
+        rating: review.rating,
+        qualityRating: review.quality_rating,
+        professionalismRating: review.professionalism_rating,
+        comment: review.comment,
+        createdAt: review.created_at
+      }));
+
+      return mappedReviews;
+    } catch (catchError) {
+      console.error(`Erro ao buscar avaliações:`, catchError);
+      return []; // Retornar array vazio em vez de lançar erro
+    }
   }
 
   async getReviewsByClient(clientId: number): Promise<Review[]> {
@@ -1047,17 +1133,57 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createReview(review: InsertReview): Promise<Review> {
+    // Mapear de camelCase (do InsertReview) para snake_case (colunas do Supabase)
+    const dbReview = {
+      session_id: review.sessionId,
+      reviewer_id: review.reviewerId,
+      photographer_id: review.photographerId, // Mapeado corretamente
+      rating: review.rating,
+      quality_rating: review.qualityRating, // Mapeado corretamente
+      professionalism_rating: review.professionalismRating, // Mapeado corretamente
+      comment: review.comment,
+      // createdAt é omitido, pois o banco de dados cuida disso com defaultNow()
+    };
+
     const { data, error } = await supabase
       .from('reviews')
-      .insert({
-        ...review,
-        createdAt: new Date()
-      })
+      .insert(dbReview) // Usar o objeto mapeado dbReview
       .select()
       .single();
 
-    if (error) throw error;
-    return data as Review;
+    if (error) {
+      console.error("Supabase error creating review:", error);
+      throw error;
+    }
+    
+    // O Supabase retorna snake_case, converter para camelCase antes de retornar
+    const resultReview: any = { ...data };
+    if (resultReview.session_id) {
+      resultReview.sessionId = resultReview.session_id;
+      delete resultReview.session_id;
+    }
+    if (resultReview.reviewer_id) {
+      resultReview.reviewerId = resultReview.reviewer_id;
+      delete resultReview.reviewer_id;
+    }
+    if (resultReview.photographer_id) {
+      resultReview.photographerId = resultReview.photographer_id;
+      delete resultReview.photographer_id;
+    }
+    if (resultReview.quality_rating) {
+      resultReview.qualityRating = resultReview.quality_rating;
+      delete resultReview.quality_rating;
+    }
+    if (resultReview.professionalism_rating) {
+      resultReview.professionalismRating = resultReview.professionalism_rating;
+      delete resultReview.professionalism_rating;
+    }
+    if (resultReview.created_at) {
+      resultReview.createdAt = resultReview.created_at;
+      delete resultReview.created_at;
+    }
+
+    return resultReview as Review;
   }
 
   // Portfolio
@@ -1200,6 +1326,44 @@ export class SupabaseStorage implements IStorage {
       return clients;
     } catch (error) {
       console.error("Erro não tratado ao buscar clientes:", error);
+      return [];
+    }
+  }
+  
+  async getAllPhotographers(): Promise<User[]> {
+    try {
+      console.log("[SupabaseStorage.getAllPhotographers] Buscando todos os fotógrafos");
+      
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('user_type', 'photographer');
+      
+      if (error) {
+        console.error("[SupabaseStorage.getAllPhotographers] Erro ao buscar fotógrafos:", error);
+        return [];
+      }
+      
+      if (!data) {
+        console.log("[SupabaseStorage.getAllPhotographers] Nenhum fotógrafo encontrado");
+        return [];
+      }
+      
+      console.log(`[SupabaseStorage.getAllPhotographers] Encontrados ${data.length} fotógrafos`);
+      
+      // Mapear user_type para userType para manter consistência
+      const photographers = data.map(photographer => {
+        const formattedPhotographer: any = { ...photographer };
+        if (formattedPhotographer.user_type) {
+          formattedPhotographer.userType = formattedPhotographer.user_type;
+          delete formattedPhotographer.user_type;
+        }
+        return formattedPhotographer as User;
+      });
+      
+      return photographers;
+    } catch (error) {
+      console.error("[SupabaseStorage.getAllPhotographers] Erro não tratado:", error);
       return [];
     }
   }
