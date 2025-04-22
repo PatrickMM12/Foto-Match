@@ -6,6 +6,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { formatPriceBRL, convertCentsToDecimal } from '@/lib/formatters';
 
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -108,10 +109,10 @@ const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCanc
   useEffect(() => {
     if (selectedService) {
       form.setValue('title', `Sessão de ${selectedService.name}`);
-      form.setValue('totalPrice', selectedService.price / 100);
+      form.setValue('totalPrice', convertCentsToDecimal(selectedService.price));
       form.setValue('duration', selectedService.duration);
       form.setValue('photosIncluded', selectedService.maxPhotos || 0);
-      form.setValue('additionalPhotoPrice', (selectedService.additionalPhotoPrice || 0) / 100);
+      form.setValue('additionalPhotoPrice', convertCentsToDecimal(selectedService.additionalPhotoPrice || 0));
     }
   }, [selectedService, form]);
   
@@ -217,7 +218,8 @@ const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCanc
     const additionalPhotosPrice = values.additionalPhotos * (values.additionalPhotoPrice || 0);
     const calculatedTotalPrice = basePrice + additionalPhotosPrice;
     
-    // Garantir que todos os valores numéricos sejam números
+    // Garantir que todos os valores numéricos sejam números, mas não convertemos para centavos aqui
+    // A API fará a conversão corretamente
     const sessionData = {
       photographerId: Number(user.id),
       clientId: Number(values.clientId),
@@ -243,10 +245,12 @@ const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCanc
   };
   
   const formatCurrency = (value: number) => {
+    // Como os valores já estão em reais (decimal), usamos o Intl.NumberFormat diretamente
+    // e não mais o formatPriceBRL que espera valores em centavos
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-    }).format(value); // Não converter centavos para reais
+    }).format(value);
   };
 
   // Calcular o valor das fotos adicionais
@@ -351,7 +355,7 @@ const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ onSuccess, onCanc
                         .filter((service: any) => service.active)
                         .map((service: any) => (
                           <SelectItem key={service.id} value={service.id.toString()}>
-                            {service.name} - {formatCurrency(service.price / 100)}
+                            {service.name} - {formatCurrency(convertCentsToDecimal(service.price))}
                           </SelectItem>
                         ))
                     )}

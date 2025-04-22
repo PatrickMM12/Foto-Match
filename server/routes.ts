@@ -593,7 +593,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("POST /api/photographers/services - Dados recebidos:", req.body);
       console.log("Tipo de conteúdo:", req.headers['content-type']);
       
-      const result = insertServiceSchema.safeParse(req.body);
+      // Verificar se os valores já estão em centavos ou precisam de conversão
+      const serviceData = { ...req.body };
+      
+      // Verificar se o preço parece estar em reais (valor decimal) em vez de centavos
+      // Se o preço for um valor pequeno (< 1000) e tiver casas decimais, provavelmente está em reais
+      if (typeof serviceData.price === 'number') {
+        const isLikelyInReais = serviceData.price < 1000 && serviceData.price % 1 !== 0;
+        console.log(`Preço recebido: ${serviceData.price}, parece estar em reais: ${isLikelyInReais}`);
+        
+        if (isLikelyInReais) {
+          // Converter para centavos
+          serviceData.price = Math.round(serviceData.price * 100);
+          console.log(`Preço convertido para centavos: ${serviceData.price}`);
+        } else {
+          console.log(`Preço mantido como está, assumindo que já está em centavos: ${serviceData.price}`);
+        }
+      }
+      
+      // Verificar se o preço adicional parece estar em reais
+      if (typeof serviceData.additionalPhotoPrice === 'number') {
+        const isLikelyInReais = serviceData.additionalPhotoPrice < 1000 && serviceData.additionalPhotoPrice % 1 !== 0;
+        console.log(`Preço adicional recebido: ${serviceData.additionalPhotoPrice}, parece estar em reais: ${isLikelyInReais}`);
+        
+        if (isLikelyInReais) {
+          // Converter para centavos
+          serviceData.additionalPhotoPrice = Math.round(serviceData.additionalPhotoPrice * 100);
+          console.log(`Preço adicional convertido para centavos: ${serviceData.additionalPhotoPrice}`);
+        } else if (serviceData.additionalPhotoPrice > 0) {
+          console.log(`Preço adicional mantido como está, assumindo que já está em centavos: ${serviceData.additionalPhotoPrice}`);
+        }
+      }
+      
+      const result = insertServiceSchema.safeParse(serviceData);
       if (!result.success) {
         console.log("Falha na validação do schema:", result.error);
         console.log("Campos esperados pelo schema:", 
@@ -606,7 +638,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      console.log("Validação do schema bem-sucedida:", result.data);
+      console.log("Validação do schema bem-sucedida. Valores em centavos:", result.data);
       
       const userId = parseInt(String(req.user.id));
       console.log(`Criando serviço para o usuário: ${userId} (${typeof userId})`);
@@ -659,8 +691,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Permissão concedida, atualizando serviço ${serviceId}`);
       
+      // Verificar se os valores já estão em centavos ou precisam de conversão
+      const serviceData = { ...req.body };
+      
+      // Verificar se o preço parece estar em reais (valor decimal) em vez de centavos
+      if (typeof serviceData.price === 'number') {
+        const isLikelyInReais = serviceData.price < 1000 && serviceData.price % 1 !== 0;
+        console.log(`Preço recebido: ${serviceData.price}, parece estar em reais: ${isLikelyInReais}`);
+        
+        if (isLikelyInReais) {
+          // Converter para centavos
+          serviceData.price = Math.round(serviceData.price * 100);
+          console.log(`Preço convertido para centavos: ${serviceData.price}`);
+        } else {
+          console.log(`Preço mantido como está, assumindo que já está em centavos: ${serviceData.price}`);
+        }
+      }
+      
+      // Verificar se o preço adicional parece estar em reais
+      if (typeof serviceData.additionalPhotoPrice === 'number') {
+        const isLikelyInReais = serviceData.additionalPhotoPrice < 1000 && serviceData.additionalPhotoPrice % 1 !== 0;
+        console.log(`Preço adicional recebido: ${serviceData.additionalPhotoPrice}, parece estar em reais: ${isLikelyInReais}`);
+        
+        if (isLikelyInReais) {
+          // Converter para centavos
+          serviceData.additionalPhotoPrice = Math.round(serviceData.additionalPhotoPrice * 100);
+          console.log(`Preço adicional convertido para centavos: ${serviceData.additionalPhotoPrice}`);
+        } else if (serviceData.additionalPhotoPrice > 0) {
+          console.log(`Preço adicional mantido como está, assumindo que já está em centavos: ${serviceData.additionalPhotoPrice}`);
+        }
+      }
+      
       // Atualizar serviço
-      const updatedService = await storage.updateService(serviceId, req.body);
+      const updatedService = await storage.updateService(serviceId, serviceData);
       
       if (!updatedService) {
         console.log(`Erro ao atualizar serviço ${serviceId}: serviço não retornado pelo storage`);
@@ -762,11 +825,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verificar o tipo de usuário para determinar o comportamento
       if (user.userType === "client") {
         // Quando cliente cria a sessão, ele deve fornecer o photographerId
-        const validatedData = insertSessionSchema.parse({
-          ...req.body,
-          clientId: user.id,
-          status: "pending", // Sessões criadas por clientes começam como pendentes
-        });
+        const sessionData = { ...req.body, clientId: user.id, status: "pending" };
+        
+        // Verificar se valores parecem ser em reais (decimal) ao invés de centavos
+        // Para evitar conversão dupla, verificamos se o valor é pequeno e tem casa decimal
+        if (typeof sessionData.totalPrice === 'number') {
+          const isLikelyInReais = sessionData.totalPrice < 1000 && sessionData.totalPrice % 1 !== 0;
+          if (isLikelyInReais) {
+            // Converter para centavos apenas se for um valor decimal
+            sessionData.totalPrice = Math.round(sessionData.totalPrice * 100);
+            console.log(`totalPrice convertido para centavos: ${sessionData.totalPrice}`);
+          }
+        }
+        
+        if (typeof sessionData.additionalPhotoPrice === 'number') {
+          const isLikelyInReais = sessionData.additionalPhotoPrice < 1000 && sessionData.additionalPhotoPrice % 1 !== 0;
+          if (isLikelyInReais) {
+            // Converter para centavos apenas se for um valor decimal
+            sessionData.additionalPhotoPrice = Math.round(sessionData.additionalPhotoPrice * 100);
+            console.log(`additionalPhotoPrice convertido para centavos: ${sessionData.additionalPhotoPrice}`);
+          }
+        }
+        
+        if (typeof sessionData.amountPaid === 'number') {
+          sessionData.amountPaid = Math.round(sessionData.amountPaid * 100);
+        }
+        
+        const validatedData = insertSessionSchema.parse(sessionData);
         
         // Garantir que a data esteja no formato correto (Date) antes de salvar
         if (typeof validatedData.date === 'string') {
@@ -803,6 +888,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Definir o status padrão se não foi fornecido
         if (!sessionData.status) {
           sessionData.status = "confirmed"; // Sessões criadas por fotógrafos já começam confirmadas por padrão
+        }
+        
+        // Verificar se valores parecem ser em reais (decimal) ao invés de centavos
+        // Para evitar conversão dupla, verificamos se o valor é pequeno e tem casa decimal
+        if (typeof sessionData.totalPrice === 'number') {
+          const isLikelyInReais = sessionData.totalPrice < 1000 && sessionData.totalPrice % 1 !== 0;
+          if (isLikelyInReais) {
+            // Converter para centavos apenas se for um valor decimal
+            sessionData.totalPrice = Math.round(sessionData.totalPrice * 100);
+            console.log(`totalPrice convertido para centavos: ${sessionData.totalPrice}`);
+          }
+        }
+        
+        if (typeof sessionData.additionalPhotoPrice === 'number') {
+          const isLikelyInReais = sessionData.additionalPhotoPrice < 1000 && sessionData.additionalPhotoPrice % 1 !== 0;
+          if (isLikelyInReais) {
+            // Converter para centavos apenas se for um valor decimal
+            sessionData.additionalPhotoPrice = Math.round(sessionData.additionalPhotoPrice * 100);
+            console.log(`additionalPhotoPrice convertido para centavos: ${sessionData.additionalPhotoPrice}`);
+          }
+        }
+        
+        if (typeof sessionData.amountPaid === 'number') {
+          sessionData.amountPaid = Math.round(sessionData.amountPaid * 100);
         }
         
         console.log("Dados da sessão após ajustes:", sessionData);
@@ -849,9 +958,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You don't have permission to update this session" });
       }
       
+      // Converter valores monetários para centavos
+      const requestData = { ...req.body };
+      
+      if (typeof requestData.totalPrice === 'number') {
+        const isLikelyInReais = requestData.totalPrice < 1000 && requestData.totalPrice % 1 !== 0;
+        if (isLikelyInReais) {
+          // Converter para centavos apenas se for um valor decimal
+          requestData.totalPrice = Math.round(requestData.totalPrice * 100);
+          console.log(`totalPrice convertido para centavos: ${requestData.totalPrice}`);
+        }
+      }
+      
+      if (typeof requestData.additionalPhotoPrice === 'number') {
+        const isLikelyInReais = requestData.additionalPhotoPrice < 1000 && requestData.additionalPhotoPrice % 1 !== 0;
+        if (isLikelyInReais) {
+          // Converter para centavos apenas se for um valor decimal
+          requestData.additionalPhotoPrice = Math.round(requestData.additionalPhotoPrice * 100);
+          console.log(`additionalPhotoPrice convertido para centavos: ${requestData.additionalPhotoPrice}`);
+        }
+      }
+      
+      // Verificar se amountPaid parece estar em reais (valor decimal) ou já em centavos
+      if (typeof requestData.amountPaid === 'number') {
+        const isLikelyInReais = requestData.amountPaid < 1000 && requestData.amountPaid % 1 !== 0;
+        if (isLikelyInReais) {
+          // Converter para centavos apenas se for um valor decimal
+          requestData.amountPaid = Math.round(requestData.amountPaid * 100);
+          console.log(`amountPaid convertido para centavos: ${requestData.amountPaid}`);
+        }
+      }
+      
       // Photographers can update status and delivery details
       // Clients can update only certain fields (like payment status)
-      const validatedData = insertSessionSchema.partial().parse(req.body);
+      const validatedData = insertSessionSchema.partial().parse(requestData);
       
       // Apply restrictions based on user type
       let updateData = validatedData;
@@ -1021,6 +1161,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error creating review:", error);
       res.status(500).json({ message: "Error creating review" });
+    }
+  });
+
+  // Rota para buscar reviews do fotógrafo logado
+  app.get('/api/reviews/me/photographer', isAuthenticated, async (req: Request, res: Response): Promise<Response> => {
+    // Anti-cache headers
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Expires', '-1');
+    res.set('Pragma', 'no-cache');
+    
+    try {
+      const user = req.user as Record<string, any>;
+      
+      // Verificação completa de autenticação
+      if (!user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      // Verificação do tipo de usuário (verificar userType e type)
+      const userType = user.userType || user.type;
+      
+      if (userType !== "photographer") {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      
+      // Extrair o ID do usuário
+      let userId: number | null = null;
+      
+      // Tentar usar user.id diretamente se for um número
+      if (typeof user.id === 'number' && !isNaN(user.id)) {
+        userId = user.id;
+      } 
+      // Se for uma string, tentar converter para número
+      else if (typeof user.id === 'string') {
+        // Remover qualquer caractere não numérico
+        const cleanedId = user.id.replace(/\D/g, '');
+        if (cleanedId) {
+          const parsedId = parseInt(cleanedId, 10);
+          if (!isNaN(parsedId)) {
+            userId = parsedId;
+          }
+        }
+      }
+      
+      // MÉTODO 2: Verificar outras propriedades que podem conter o ID
+      if (!userId) {
+        // Propriedades comuns que podem conter o ID do usuário
+        const possibleIdFields = ['userId', 'user_id', 'photographerId', 'photographer_id', 'sub'];
+        
+        for (const field of possibleIdFields) {
+          if (user[field] !== undefined) {
+            let fieldValue = user[field];
+            let parsedId: number | null = null;
+            
+            // Tentar converter para número dependendo do tipo
+            if (typeof fieldValue === 'number' && !isNaN(fieldValue)) {
+              parsedId = fieldValue;
+            } else if (typeof fieldValue === 'string') {
+              // Extrair números da string
+              const matches = fieldValue.match(/\d+/);
+              if (matches) {
+                parsedId = parseInt(matches[0], 10);
+              }
+            }
+            
+            if (parsedId !== null && !isNaN(parsedId)) {
+              userId = parsedId;
+              break;
+            }
+          }
+        }
+      }
+      
+      // MÉTODO 3: Buscar pelo email do usuário
+      if (!userId && user.email) {
+        try {
+          const userByEmail = await storage.getUserByEmail(user.email);
+          
+          if (userByEmail) {
+            userId = userByEmail.id;
+          }
+        } catch (emailError) {
+          console.error(`Erro ao buscar usuário por email:`, emailError);
+        }
+      }
+      
+      // Verificação final
+      if (!userId || isNaN(userId)) {
+        return res.status(200).json([]);  // Retornar array vazio se não for possível determinar o ID
+      }
+      
+      // Buscar as avaliações usando o ID encontrado e o novo método
+      const reviews = await storage.getReviewsByUserId(userId);
+      
+      return res.json(reviews);
+    } catch (error) {
+      console.error('Erro ao buscar avaliações do fotógrafo:', error);
+      return res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -1297,6 +1535,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  // TEMPORÁRIO: Rota de diagnóstico para examinar a tabela de reviews
+  app.get("/api/debug/reviews-table", isAuthenticated, async (req: Request, res: Response): Promise<any> => {
+    try {
+      if (req.user.userType !== 'photographer') {
+        return res.status(403).json({ message: 'Apenas fotógrafos podem acessar' });
+      }
+      
+      // Anti-cache headers
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.set('Expires', '-1');
+      res.set('Pragma', 'no-cache');
+      
+      // Buscar todos os reviews (limitar a 100 para evitar excesso)
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('*')
+        .limit(100);
+      
+      if (error) {
+        console.error('Erro ao buscar diagnóstico da tabela reviews:', error);
+        return res.status(500).json({ error: error.message });
+      }
+      
+      // Extrair informação sobre as colunas a partir dos dados
+      const columnInfo: Record<string, any> = {};
+      if (data && data.length > 0) {
+        const sampleRow = data[0];
+        Object.keys(sampleRow).forEach(key => {
+          columnInfo[key] = {
+            tipo: typeof sampleRow[key],
+            exemplo: sampleRow[key]
+          };
+        });
+      }
+      
+      // Contar os valores únicos de photographer_id e reviewer_id para diagnóstico
+      const photographerIds = data ? Array.from(new Set(data.map(r => r.photographer_id))) : [];
+      const reviewerIds = data ? Array.from(new Set(data.map(r => r.reviewer_id))) : [];
+      
+      // Contar registros por photographer_id
+      const countByPhotographer: Record<number, number> = {};
+      if (data) {
+        data.forEach(r => {
+          if (r.photographer_id) {
+            const id = r.photographer_id;
+            countByPhotographer[id] = (countByPhotographer[id] || 0) + 1;
+          }
+        });
+      }
+      
+      return res.json({
+        totalReviews: data?.length || 0,
+        colunas: columnInfo,
+        photographerIds,
+        reviewerIds,
+        countByPhotographer
+      });
+    } catch (error) {
+      console.error('Erro no diagnóstico de reviews:', error);
+      return res.status(500).json({ message: 'Erro interno no servidor' });
+    }
+  });
+
+  // Rota temporária para criar uma review de teste
+  app.get("/api/debug/create-test-review", async (req, res) => {
+    try {
+      // Anti-cache headers
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.set('Expires', '-1');
+      res.set('Pragma', 'no-cache');
+      
+      console.log('[DEBUG] Iniciando criação de avaliação de teste');
+      
+      // Buscar fotógrafos e clientes para usar como referência
+      const photographers = await storage.getAllPhotographers();
+      const clients = await storage.getClientUsers();
+      
+      if (photographers.length === 0) {
+        return res.status(400).json({ message: 'Nenhum fotógrafo encontrado para criar avaliação' });
+      }
+      
+      if (clients.length === 0) {
+        return res.status(400).json({ message: 'Nenhum cliente encontrado para criar avaliação' });
+      }
+      
+      // Usar o primeiro fotógrafo e cliente encontrados
+      const photographer = photographers[0];
+      const client = clients[0];
+      
+      console.log(`[DEBUG] Usando fotógrafo ID=${photographer.id}, cliente ID=${client.id}`);
+      
+      // Criar dados da review
+      const reviewData = {
+        photographerId: photographer.id,
+        reviewerId: client.id,
+        sessionId: 1, // ID fictício para teste
+        rating: 4.5,
+        qualityRating: 4.0,
+        professionalismRating: 5.0,
+        comment: "Esta é uma avaliação de teste criada pelo sistema para verificar a funcionalidade."
+      };
+      
+      // Criar a review
+      const review = await storage.createReview(reviewData);
+      
+      console.log(`[DEBUG] Avaliação de teste criada com sucesso: ID=${review.id}`);
+      
+      // Retornar a review criada
+      return res.status(201).json({ 
+        message: 'Avaliação de teste criada com sucesso',
+        review,
+        photographerId: photographer.id,
+        reviewerId: client.id
+      });
+    } catch (error) {
+      console.error('[DEBUG] Erro ao criar avaliação de teste:', error);
+      return res.status(500).json({ 
+        message: 'Erro ao criar avaliação de teste', 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  const server = createServer(app);
+
+  // Iniciar o servidor (ou retornar para ser iniciado externamente)
+  // Exemplo: server.listen(3000, () => console.log('Server listening on port 3000'));
+  
+  return server; // Retornar a instância do servidor HTTP
 }

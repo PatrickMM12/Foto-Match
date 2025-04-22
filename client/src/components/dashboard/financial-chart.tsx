@@ -1,20 +1,11 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
-import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, startOfYear, endOfYear, eachMonthOfInterval, subYears } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, startOfYear, endOfYear, eachMonthOfInterval, subYears, getMonth, getYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-
-interface Transaction {
-  id: number;
-  userId: number;
-  sessionId?: number;
-  amount: number;
-  description: string;
-  category: string;
-  date: string;
-  type: 'income' | 'expense';
-}
+import { convertCentsToDecimal } from '@/lib/formatters';
+import { Transaction } from '@/types/transactions';
 
 interface Session {
   id: number;
@@ -170,9 +161,11 @@ const FinancialChart: React.FC<FinancialChartProps> = ({
       
       if (dataPoint) {
         if (transaction.type === 'income') {
-          dataPoint.income += transaction.amount;
+          // Converter de centavos para reais
+          dataPoint.income += convertCentsToDecimal(transaction.amount);
         } else {
-          dataPoint.expense += Math.abs(transaction.amount);
+          // Converter de centavos para reais
+          dataPoint.expense += convertCentsToDecimal(Math.abs(transaction.amount));
         }
         dataPoint.balance = dataPoint.income - dataPoint.expense;
       }
@@ -214,8 +207,8 @@ const FinancialChart: React.FC<FinancialChartProps> = ({
         });
         
         if (dataPoint) {
-          // Adicionar o valor pago como receita
-          dataPoint.income += session.amountPaid;
+          // Adicionar o valor pago como receita (convertido de centavos para reais)
+          dataPoint.income += convertCentsToDecimal(session.amountPaid);
           dataPoint.balance = dataPoint.income - dataPoint.expense;
         }
       });

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import React from 'react';
+import { formatPriceBRL, convertCentsToDecimal, convertDecimalToCents } from '@/lib/formatters';
 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -46,7 +47,8 @@ const SessionForm: React.FC<SessionFormProps> = ({
   const [date, setDate] = useState<Date | undefined>(
     session?.date ? new Date(session.date) : undefined
   );
-  
+  const [displayAmountPaid, setDisplayAmountPaid] = useState('');
+
   const form = useForm<SessionFormValues>({
     resolver: zodResolver(sessionSchema),
     defaultValues: {
@@ -56,11 +58,40 @@ const SessionForm: React.FC<SessionFormProps> = ({
       status: session?.status || 'pending',
       photosDelivered: session?.photosDelivered || 0,
       paymentStatus: session?.paymentStatus || 'pending',
-      amountPaid: session?.amountPaid || 0,
+      amountPaid: convertCentsToDecimal(session?.amountPaid) || 0,
     },
   });
 
+  useEffect(() => {
+    const initialAmount = form.getValues('amountPaid');
+    setDisplayAmountPaid(
+      new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(initialAmount || 0)
+    );
+  }, [form]);
+
+  const formatCurrencyForDisplay = (value: number | string): string => {
+    const num = typeof value === 'string' ? parseFloat(value.replace(',', '.')) : value;
+    if (isNaN(num)) return '0,00';
+    return new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num);
+  };
+
+  const parseDisplayCurrency = (value: string): number => {
+    const cleaned = value.replace(/[^0-9,]/g, '').replace(',', '.');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
+
   const onSubmit = (values: SessionFormValues) => {
+    const amountPaidNumber = typeof values.amountPaid === 'string' 
+      ? parseDisplayCurrency(values.amountPaid) 
+      : values.amountPaid;
+
     onSave({
       ...values,
       date: date?.toISOString(),
@@ -71,6 +102,7 @@ const SessionForm: React.FC<SessionFormProps> = ({
       photosIncluded: session.photosIncluded || 0,
       additionalPhotos: session.additionalPhotos || 0,
       additionalPhotoPrice: session.additionalPhotoPrice || 0,
+      amountPaid: Math.round(amountPaidNumber * 100),
     });
   };
 
@@ -230,7 +262,7 @@ const SessionForm: React.FC<SessionFormProps> = ({
             <p className="text-sm font-medium">Valor Total</p>
             <div className="flex items-center text-muted-foreground">
               <DollarSign className="h-4 w-4 mr-2" />
-              <span>R$ {(session?.totalPrice || 0).toFixed(2).replace('.', ',')}</span>
+              <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(convertCentsToDecimal(session?.totalPrice || 0))}</span>
             </div>
           </div>
           
@@ -327,12 +359,23 @@ const SessionForm: React.FC<SessionFormProps> = ({
                   <FormItem>
                     <FormLabel>Valor Pago (R$)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        step="0.01"
+                      <Input
+                        type="text"
                         placeholder="0,00"
-                        {...field} 
+                        value={displayAmountPaid}
+                        onChange={(e) => {
+                          const rawValue = e.target.value;
+                          const numericValue = parseDisplayCurrency(rawValue);
+                          
+                          field.onChange(numericValue); 
+                          
+                          setDisplayAmountPaid(rawValue.replace(/[^0-9,]/g, '')); 
+                        }}
+                        onBlur={(e) => {
+                          const numericValue = parseDisplayCurrency(e.target.value);
+                          setDisplayAmountPaid(formatCurrencyForDisplay(numericValue));
+                          field.onChange(numericValue);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />

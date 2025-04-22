@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calendar, MapPin, Clock, DollarSign, User, Star } from 'lucide-react';
+import { formatPriceBRL } from '@/lib/formatters';
 
 // Definir a interface da sessão para evitar erros de tipagem
 interface Session {
@@ -89,11 +90,7 @@ const ClientBookings = () => {
   };
   
   const formatCurrency = (amount: number) => {
-    if (typeof amount !== 'number' || isNaN(amount)) {
-        console.warn("formatCurrency recebeu um valor inválido:", amount);
-        return 'R$ --,--';
-    }
-    return `R$ ${(amount / 100).toFixed(2).replace('.', ',')}`;
+    return formatPriceBRL(amount);
   };
   
   if (isLoading) {

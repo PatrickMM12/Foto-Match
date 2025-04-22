@@ -11,17 +11,8 @@ import {
   isSameMonth 
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
-interface Transaction {
-  id: number;
-  userId: number;
-  sessionId?: number;
-  amount: number;
-  description: string;
-  category: string;
-  date: string;
-  type: 'income' | 'expense';
-}
+import { convertCentsToDecimal } from '@/lib/formatters';
+import { Transaction } from '@/types/transactions';
 
 interface Session {
   id: number;
@@ -85,9 +76,9 @@ const TrendAnalysisChart: React.FC<TrendAnalysisChartProps> = ({
       
       if (monthData) {
         if (transaction.type === 'income') {
-          monthData.income += transaction.amount;
+          monthData.income += convertCentsToDecimal(transaction.amount);
         } else {
-          monthData.expense += Math.abs(transaction.amount);
+          monthData.expense += convertCentsToDecimal(Math.abs(transaction.amount));
         }
         
         // Atualizar lucro
@@ -117,7 +108,7 @@ const TrendAnalysisChart: React.FC<TrendAnalysisChartProps> = ({
         );
         
         if (monthData) {
-          monthData.income += session.amountPaid;
+          monthData.income += convertCentsToDecimal(session.amountPaid);
           
           // Atualizar lucro
           monthData.profit = monthData.income - monthData.expense;

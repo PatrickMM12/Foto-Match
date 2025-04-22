@@ -3,6 +3,9 @@ import { useState } from 'react';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import React from 'react';
+import { formatPriceBRL, convertCentsToDecimal } from '@/lib/formatters';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 import PhotographerSidebar from '@/components/layout/photographer-sidebar';
 import PageTitle from '@/components/shared/page-title';
@@ -152,7 +155,8 @@ const PhotographerSessions = () => {
   };
   
   const formatCurrency = (amount: number) => {
-    return `R$ ${amount.toFixed(2).replace('.', ',')}`;
+    // Converter de centavos para reais antes de formatar
+    return formatPriceBRL(amount);
   };
   
   // Usamos useMemo para calcular as listas filtradas sempre que sessions mudar

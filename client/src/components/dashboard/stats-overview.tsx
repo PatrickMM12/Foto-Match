@@ -1,14 +1,34 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowUpIcon, ArrowDownIcon, Star } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
+import ReviewsModal from './reviews-modal';
+import { convertCentsToDecimal } from '@/lib/formatters';
+
+// Definir a interface Review para usar no componente
+interface Review {
+  id: number;
+  sessionId: number;
+  reviewerId: number;
+  photographerId: number;
+  rating: number;
+  qualityRating: number;
+  professionalismRating: number;
+  comment?: string | null;
+  createdAt: string;
+}
 
 interface StatsOverviewProps {
   monthlyIncome: number;
   previousMonthIncome: number;
   upcomingSessions: number;
   averageRating: number;
+  averageQualityRating: number;
+  averageProfessionalismRating: number;
   reviewCount: number;
   conversionRate: number;
   totalRequests: number;
+  reviews?: Review[];
 }
 
 const StatsOverview: React.FC<StatsOverviewProps> = ({
@@ -16,20 +36,34 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   previousMonthIncome,
   upcomingSessions,
   averageRating,
+  averageQualityRating,
+  averageProfessionalismRating,
   reviewCount,
   conversionRate,
   totalRequests,
+  reviews = [],
 }) => {
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+  
+  // Debug: Log valores importantes para verificar
+  useEffect(() => {
+    console.log('StatsOverview - reviewCount:', reviewCount);
+    console.log('StatsOverview - reviews.length:', reviews.length);
+    console.log('StatsOverview - averageRating:', averageRating);
+  }, [reviewCount, reviews, averageRating]);
+  
   const incomeChange = monthlyIncome - previousMonthIncome;
   const percentChange = previousMonthIncome > 0 
     ? Math.round((incomeChange / previousMonthIncome) * 100) 
     : 0;
   
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amountInCents: number) => {
+    // Converter centavos para reais ANTES de formatar
+    const amountInReais = convertCentsToDecimal(amountInCents);
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-    }).format(amount);
+    }).format(amountInReais);
   };
 
   // Function to render stars based on rating
@@ -73,95 +107,113 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* Monthly Revenue Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex justify-between items-start mb-3">
-            <p className="text-muted-foreground font-medium">Receita Mensal</p>
-            {percentChange !== 0 && (
-              <span 
-                className={`text-xs font-medium px-2 py-1 rounded flex items-center ${
-                  percentChange >= 0 
-                    ? 'text-green-700 bg-green-100' 
-                    : 'text-red-700 bg-red-100'
-                }`}
-              >
-                {percentChange >= 0 ? (
-                  <ArrowUpIcon className="h-3 w-3 mr-1" />
-                ) : (
-                  <ArrowDownIcon className="h-3 w-3 mr-1" />
-                )}
-                {Math.abs(percentChange)}%
-              </span>
-            )}
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{formatCurrency(monthlyIncome)}</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            vs {formatCurrency(previousMonthIncome)} mês anterior
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Upcoming Sessions Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex justify-between items-start mb-3">
-            <p className="text-muted-foreground font-medium">Sessões Agendadas</p>
-            {upcomingSessions > 0 && (
-              <span className="text-green-700 bg-green-100 text-xs font-medium px-2 py-1 rounded">
-                +{upcomingSessions}
-              </span>
-            )}
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{upcomingSessions}</p>
-          <p className="text-sm text-muted-foreground mt-1">próximos 30 dias</p>
-        </CardContent>
-      </Card>
-
-      {/* Average Rating Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex justify-between items-start mb-3">
-            <p className="text-muted-foreground font-medium">Avaliação Média</p>
-            {reviewCount > 0 && (
-              <span className="text-yellow-700 bg-yellow-100 text-xs font-medium px-2 py-1 rounded">
-                {reviewCount} {reviewCount === 1 ? 'avaliação' : 'avaliações'}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center">
-            <p className="text-2xl font-bold text-gray-900 mr-2">{averageRating.toFixed(1)}</p>
-            <div className="flex">
-              {renderStars(averageRating)}
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Monthly Revenue Card */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start mb-3">
+              <p className="text-muted-foreground font-medium">Receita Mensal</p>
+              {percentChange !== 0 && (
+                <span 
+                  className={`text-xs font-medium px-2 py-1 rounded flex items-center ${
+                    percentChange >= 0 
+                      ? 'text-green-700 bg-green-100' 
+                      : 'text-red-700 bg-red-100'
+                  }`}
+                >
+                  {percentChange >= 0 ? (
+                    <ArrowUpIcon className="h-3 w-3 mr-1" />
+                  ) : (
+                    <ArrowDownIcon className="h-3 w-3 mr-1" />
+                  )}
+                  {Math.abs(percentChange)}%
+                </span>
+              )}
             </div>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            {reviewCount > 0 
-              ? `baseado em ${reviewCount} ${reviewCount === 1 ? 'avaliação' : 'avaliações'}`
-              : 'sem avaliações ainda'}
-          </p>
-        </CardContent>
-      </Card>
+            <p className="text-2xl font-bold text-gray-900">{formatCurrency(monthlyIncome)}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              vs {formatCurrency(previousMonthIncome)} mês anterior
+            </p>
+          </CardContent>
+        </Card>
 
-      {/* Conversion Rate Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex justify-between items-start mb-3">
-            <p className="text-muted-foreground font-medium">Taxa de Conversão</p>
-            {totalRequests > 0 && (
-              <span className="text-blue-700 bg-blue-100 text-xs font-medium px-2 py-1 rounded">
-                {totalRequests} {totalRequests === 1 ? 'solicitação' : 'solicitações'}
-              </span>
-            )}
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{conversionRate.toFixed(0)}%</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            de solicitações aceitas
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+        {/* Upcoming Sessions Card */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start mb-3">
+              <p className="text-muted-foreground font-medium">Sessões Agendadas</p>
+              {upcomingSessions > 0 && (
+                <span className="text-green-700 bg-green-100 text-xs font-medium px-2 py-1 rounded">
+                  +{upcomingSessions}
+                </span>
+              )}
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{upcomingSessions}</p>
+            <p className="text-sm text-muted-foreground mt-1">próximos 30 dias</p>
+          </CardContent>
+        </Card>
+
+        {/* Average Rating Card */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start mb-3">
+              <p className="text-muted-foreground font-medium">Avaliação Geral</p>
+              {reviewCount > 0 && (
+                <span className="text-yellow-700 bg-yellow-100 text-xs font-medium px-2 py-1 rounded">
+                  {reviewCount} {reviewCount === 1 ? 'avaliação' : 'avaliações'}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center">
+              <p className="text-2xl font-bold text-gray-900 mr-2">{averageRating.toFixed(1)}</p>
+              <div className="flex">
+                {renderStars(averageRating)}
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {reviewCount > 0 
+                ? `média de ${reviewCount} ${reviewCount === 1 ? 'avaliação' : 'avaliações'}`
+                : 'sem avaliações'}
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-3 w-full"
+              onClick={() => setShowReviewsModal(true)}
+            >
+              Ver detalhes
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Acceptance Rate Card */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-start mb-3">
+              <p className="text-muted-foreground font-medium">Taxa de Aceitação</p>
+              {/* Pode adicionar um ícone ou indicador aqui se desejar */}
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{conversionRate.toFixed(1)}%</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              de {totalRequests} {totalRequests === 1 ? 'solicitação' : 'solicitações'}
+            </p>
+            {/* Pode adicionar um botão ou link aqui se desejar */}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Reviews Modal */}
+      <ReviewsModal 
+        open={showReviewsModal} 
+        onOpenChange={setShowReviewsModal}
+        averageRating={averageRating}
+        averageQualityRating={averageQualityRating}
+        averageProfessionalismRating={averageProfessionalismRating}
+        reviewCount={reviewCount}
+        reviews={reviews}
+      />
+    </>
   );
 };
 

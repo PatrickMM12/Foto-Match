@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Star, MapPin, Camera, Calendar, Clock, Award, DollarSign } from 'lucide-react';
+import { formatPriceBRL } from '@/lib/formatters';
 
 // Interfaces para tipagem
 interface Service {
@@ -333,12 +334,9 @@ const PhotographerDetail = () => {
                             </CardHeader>
                             <CardContent>
                               <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center">
-                                    <DollarSign className="h-4 w-4 mr-1 text-primary" />
-                                    <span className="font-medium">Preço:</span>
-                                  </div>
-                                  <span>R$ {(service.price / 100).toFixed(2).replace('.', ',')}</span>
+                                <div className="flex justify-between items-center">
+                                  <h3 className="text-base font-medium">{service.name}</h3>
+                                  <span>{formatPriceBRL(service.price)}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center">
@@ -355,12 +353,9 @@ const PhotographerDetail = () => {
                                   <span>{service.maxPhotos || 'Não especificado'}</span>
                                 </div>
                                 {service.additionalPhotoPrice !== null && service.additionalPhotoPrice > 0 && (
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center">
-                                      <DollarSign className="h-4 w-4 mr-1 text-primary" />
-                                      <span className="font-medium">Foto adicional:</span>
-                                    </div>
-                                    <span>R$ {(service.additionalPhotoPrice / 100).toFixed(2).replace('.', ',')}</span>
+                                  <div className="mt-2 text-sm text-gray-500 flex justify-between">
+                                    <span>Fotos adicionais:</span>
+                                    <span>{formatPriceBRL(service.additionalPhotoPrice)}</span>
                                   </div>
                                 )}
                               </div>

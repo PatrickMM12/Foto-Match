@@ -130,17 +130,32 @@ const ServiceManager = ({ userId }: { userId: number }) => {
   // Create or update service mutation
   const serviceMutation = useMutation({
     mutationFn: async (values: ServiceFormValues) => {
-      // Convert currency to cents
+      // Converter valores para centavos
+      const priceInCents = Math.round(values.price * 100);
+      let additionalPriceInCents = null;
+      
+      if (values.additionalPhotoPrice !== null && values.additionalPhotoPrice !== undefined) {
+        additionalPriceInCents = Math.round(values.additionalPhotoPrice * 100);
+      }
+      
       const serviceData = {
         ...values,
         userId,
-        price: Math.round(values.price * 100), // Convert to cents
-        additionalPhotoPrice: values.additionalPhotoPrice 
-          ? Math.round(values.additionalPhotoPrice * 100) 
-          : null, // Convert to cents
+        price: priceInCents,
+        additionalPhotoPrice: additionalPriceInCents,
       };
       
-      console.log('Enviando dados do serviço:', serviceData);
+      console.log('Valores originais:', {
+        price: values.price,
+        additionalPhotoPrice: values.additionalPhotoPrice
+      });
+      
+      console.log('Valores convertidos para centavos:', {
+        price: priceInCents,
+        additionalPhotoPrice: additionalPriceInCents
+      });
+      
+      console.log('Dados completos a serem enviados:', serviceData);
       
       try {
         if (editingService) {
@@ -182,7 +197,6 @@ const ServiceManager = ({ userId }: { userId: number }) => {
           console.log('Criando novo serviço');
           
           // Usar os nomes de campos camelCase conforme o schema define
-          // Verificando a definição em shared/schema.ts
           const res = await apiRequest('POST', '/api/photographers/services', serviceData);
           
           console.log('Status da resposta:', res.status, res.statusText);

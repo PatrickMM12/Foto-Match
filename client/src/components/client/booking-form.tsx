@@ -7,6 +7,7 @@ import { ptBR } from 'date-fns/locale';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { convertCentsToDecimal } from '@/lib/formatters';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -136,7 +137,7 @@ const BookingForm = ({ photographerId, services, onBookingComplete }: BookingFor
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-    }).format(value / 100); // Converter centavos para real
+    }).format(value / 100); // Manter conversão de centavos para real
   };
   
   // Handler de submit

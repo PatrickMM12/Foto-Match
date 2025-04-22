@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { ArrowUpCircle, ArrowDownCircle, DollarSign } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { convertCentsToDecimal } from '@/lib/formatters';
 
 interface Transaction {
   id: number;
@@ -62,7 +63,7 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({ transactions }) => 
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-    }).format(value);
+    }).format(convertCentsToDecimal(value));
   };
 
   // Processamento de dados

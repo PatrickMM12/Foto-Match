@@ -1,26 +1,17 @@
 import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-
-interface Transaction {
-  id: number;
-  userId: number;
-  sessionId?: number;
-  amount: number;
-  description: string;
-  category: string;
-  date: string;
-  type: 'income' | 'expense';
-}
-
-interface ExpenseCategoryChartProps {
-  transactions: Transaction[];
-}
+import { convertCentsToDecimal } from '@/lib/formatters';
+import { Transaction } from '@/types/transactions';
 
 // Cores para as diferentes categorias
 const COLORS = [
   '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
   '#FF9F40', '#2E7D32', '#C2185B', '#7B1FA2', '#1565C0'
 ];
+
+interface ExpenseCategoryChartProps {
+  transactions: Transaction[];
+}
 
 const ExpenseCategoryChart: React.FC<ExpenseCategoryChartProps> = ({ transactions }) => {
   const categoryData = useMemo(() => {
@@ -35,7 +26,8 @@ const ExpenseCategoryChart: React.FC<ExpenseCategoryChartProps> = ({ transaction
       if (!categories[category]) {
         categories[category] = 0;
       }
-      categories[category] += Math.abs(expense.amount);
+      // Converter de centavos para reais
+      categories[category] += convertCentsToDecimal(Math.abs(expense.amount));
     });
     
     // Converter para formato adequado para o gráfico

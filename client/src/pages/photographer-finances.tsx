@@ -1,9 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, startOfMonth, endOfMonth, isFuture, isWithinInterval, startOfYear, endOfYear, subDays, subYears } from 'date-fns';
+import { 
+  format, 
+  parseISO, 
+  startOfMonth, 
+  endOfMonth, 
+  isFuture, 
+  isWithinInterval, 
+  startOfYear, 
+  endOfYear, 
+  subDays, 
+  subYears, 
+  getMonth, 
+  getYear,
+  isToday,
+  isSameMonth,
+  isSameDay
+} from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatPriceBRL, convertCentsToDecimal } from '@/lib/formatters';
+import { Transaction } from '@/types/transactions';
+import { Session } from '@/types/sessions';
 
 import PhotographerSidebar from '@/components/layout/photographer-sidebar';
 import PageTitle from '@/components/shared/page-title';
@@ -42,30 +61,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Interfaces para tipagem
-interface Transaction {
-  id: number;
-  userId: number;
-  sessionId?: number;
-  amount: number;
-  description: string;
-  category: string;
-  date: string;
-  type: 'income' | 'expense';
-  photographerId?: number;
-  createdAt?: string;
-}
-
-interface Session {
-  id: number;
-  title: string;
-  clientName?: string;
-  date: string;
-  totalPrice: number;
-  amountPaid: number;
-  paymentStatus: string;
-  status: string;
-}
-
 interface FinancialSummary {
   income: number;
   expenses: number;
@@ -144,6 +139,41 @@ const PhotographerFinances = () => {
       });
     }
   });
+  
+  // Geração da lista combinada de itens financeiros (transações + receitas de sessões)
+  const combinedFinancialItems = useMemo(() => {
+    const manualTransactions = transactions || [];
+    const sessionList = sessions || [];
+    const combinedList: Transaction[] = [...manualTransactions];
+
+    sessionList.forEach(session => {
+      if (session.amountPaid > 0) {
+        const hasManualIncomeTransaction = manualTransactions.some(
+          t => t.sessionId === session.id && t.type === 'income'
+        );
+
+        if (!hasManualIncomeTransaction) {
+          const userIdForTransaction = session.photographerId;
+          
+          combinedList.push({
+            id: `session-income-${session.id}`,
+            amount: session.amountPaid,
+            description: `Receita da Sessão: ${session.title}`,
+            category: 'Sessão Fotográfica',
+            date: session.date,
+            type: 'income',
+            sessionId: session.id,
+            userId: userIdForTransaction,
+            photographerId: userIdForTransaction,
+          });
+        }
+      }
+    });
+    
+    combinedList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    return combinedList;
+  }, [transactions, sessions]);
   
   // Filtrar transações e sessões por período
   const filterItemsByTimePeriod = (date: string, period: string) => {
@@ -229,7 +259,8 @@ const PhotographerFinances = () => {
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
     
     // Calcular valores pendentes (sessões confirmadas/concluídas com pagamento pendente)
-    const pendingAmount = currentFilteredSessions
+    // Modificação: usando todas as sessões, independente do período selecionado
+    const pendingAmount = sessions
       .filter(s => (s.status === 'completed' || s.status === 'confirmed') && 
                  (s.paymentStatus === 'pending' || s.paymentStatus === 'partial'))
       .reduce((sum, s) => {
@@ -281,23 +312,23 @@ const PhotographerFinances = () => {
     createTransactionMutation.mutate(transactionData);
   };
   
-  // Filtrar sessões concluídas que ainda não têm transações associadas
+  // Filtrar sessões concluídas que precisam de registro financeiro
   const completedSessionsWithoutTransactions = useMemo(() => 
     sessions
       ?.filter(session => 
-        session.status === 'completed' && 
-        session.amountPaid > 0 && 
-        !transactions?.some(t => t.sessionId === session.id)
+        session.status === 'completed' &&      // Sessão está concluída
+        session.amountPaid > 0 &&         // Houve algum pagamento
+        session.paymentStatus !== 'paid' && // Pagamento ainda não está marcado como 'Pago'
+        session.amountPaid < session.totalPrice && // Valor pago é menor que o total
+        !transactions?.some(t => t.sessionId === session.id) // Não existe transação registrada
       ) || [], 
     [sessions, transactions]
   );
   
   // Formatar valores monetários
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(amount);
+    // Converter de centavos para reais antes de formatar
+    return formatPriceBRL(amount);
   };
   
   // Componente de cartão de resumo financeiro
@@ -380,7 +411,7 @@ const PhotographerFinances = () => {
   };
   
   // Componente de transação recente
-  const RecentTransactionItem = ({ transaction }: { transaction: Transaction }) => (
+  const RecentTransactionItem = ({ transaction }: { transaction: Transaction & { id: number | string } }) => (
     <div className="flex items-center justify-between py-3 border-b last:border-0">
       <div className="flex items-center">
         <div className={`p-2 rounded-full mr-3 ${
@@ -595,17 +626,17 @@ const PhotographerFinances = () => {
                   <CardDescription>
                     Visualização de receitas e despesas ao longo do tempo
                   </CardDescription>
-            </CardHeader>
-            <CardContent>
+                </CardHeader>
+                <CardContent>
                   <div className="h-[300px]">
                     <FinancialChart 
-                      transactions={transactions || []} 
+                      transactions={transactions || []}
                       sessions={sessions || []}
                       selectedPeriod={selectedTimePeriod}
                     />
-              </div>
-            </CardContent>
-          </Card>
+                  </div>
+                </CardContent>
+              </Card>
           
               <div className="flex flex-col gap-6">
           <Card>
@@ -620,15 +651,15 @@ const PhotographerFinances = () => {
             </CardHeader>
                   <CardContent className="p-0">
                     <ScrollArea className="h-[200px] px-4">
-                      {transactions?.length === 0 ? (
+                      {combinedFinancialItems.length === 0 ? (
                         <div className="flex justify-center items-center h-full">
                           <p className="text-muted-foreground text-sm">Nenhuma transação ainda</p>
-              </div>
+                        </div>
                       ) : (
-                        transactions?.slice(0, 5).map(transaction => (
+                        combinedFinancialItems.slice(0, 5).map(item => (
                           <RecentTransactionItem 
-                            key={transaction.id} 
-                            transaction={transaction}
+                            key={item.id}
+                            transaction={item}
                           />
                         ))
                       )}
@@ -690,7 +721,7 @@ const PhotographerFinances = () => {
               </CardHeader>
               <CardContent>
                 <TransactionList 
-                  transactions={transactions || []} 
+                  transactions={combinedFinancialItems}
                 />
               </CardContent>
             </Card>
@@ -778,8 +809,8 @@ const PhotographerFinances = () => {
               <CardContent className="space-y-6">
                 {/* Comparação de Desempenho */}
                 <PerformanceComparison 
-                  transactions={filteredTransactions} 
-                  sessions={filteredSessions as any} 
+                  transactions={transactions || []}
+                  sessions={sessions || []}
                 />
                 
                 {/* Análise de Tendências */}
@@ -788,8 +819,8 @@ const PhotographerFinances = () => {
                   <Card>
                     <CardContent className="p-6">
                       <TrendAnalysisChart 
-                        transactions={transactions || []} 
-                        sessions={sessions || []} 
+                        transactions={transactions || []}
+                        sessions={sessions || []}
                         months={12}
                       />
                     </CardContent>
@@ -842,8 +873,8 @@ const PhotographerFinances = () => {
                 {/* Projeção Financeira */}
                 <div className="mt-8">
                   <FinancialProjection 
-                    transactions={transactions || []} 
-                    sessions={sessions || []} 
+                    transactions={transactions || []}
+                    sessions={sessions || []}
                   />
                 </div>
                 
@@ -862,7 +893,7 @@ const PhotographerFinances = () => {
                         </div>
                         <p className="text-xl font-bold text-green-600">
                           {formatCurrency(
-                            filteredTransactions
+                            filteredTransactions 
                               .filter(t => t.type === 'income')
                               .reduce((sum, t) => sum + t.amount, 0)
                           )}

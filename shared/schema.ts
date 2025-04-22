@@ -122,20 +122,22 @@ export const insertServiceSchema = createInsertSchema(services).omit({
 export const insertSessionSchema = z.object({
   photographerId: z.number(),
   clientId: z.number(),
-  serviceId: z.number(),
+  serviceId: z.number().optional(),
   title: z.string().min(3, "Título deve ter pelo menos 3 caracteres"),
   description: z.string().optional(),
   date: z.union([z.string(), z.date()]),
   duration: z.number().min(1, "Duração deve ser pelo menos 1 minuto"),
   location: z.string().min(3, "Local deve ter pelo menos 3 caracteres"),
+  locationLat: z.number().optional(),
+  locationLng: z.number().optional(),
   status: z.enum(["pending", "confirmed", "completed", "canceled"]).default("pending"),
-  totalPrice: z.number().min(0, "Preço total não pode ser negativo"), // Valor em reais, não centavos
+  totalPrice: z.coerce.number().min(0, "Preço total não pode ser negativo"),
   photosIncluded: z.number().min(0, "Número de fotos incluídas não pode ser negativo"),
-  photosDelivered: z.number().min(0, "Número de fotos entregues não pode ser negativo").default(0),
-  additionalPhotos: z.number().min(0, "Número de fotos adicionais não pode ser negativo").default(0),
-  additionalPhotoPrice: z.coerce.number().min(0, "Preço de fotos adicionais não pode ser negativo").default(0), // Garantir que seja sempre um número
-  paymentStatus: z.enum(["pending", "partial", "paid"]).default("pending"),
-  amountPaid: z.number().min(0, "Valor pago não pode ser negativo").default(0), // Valor em reais, não centavos
+  photosDelivered: z.number().min(0, "Número de fotos entregues não pode ser negativo").optional().default(0),
+  additionalPhotos: z.number().min(0, "Número de fotos adicionais não pode ser negativo").optional().default(0),
+  additionalPhotoPrice: z.coerce.number().min(0, "Preço de fotos adicionais não pode ser negativo").optional().default(0),
+  paymentStatus: z.enum(["pending", "partial", "paid"]).optional().default("pending"),
+  amountPaid: z.coerce.number().min(0, "Valor pago não pode ser negativo").optional().default(0),
 });
 
 export const insertTransactionSchema = createInsertSchema(transactions)

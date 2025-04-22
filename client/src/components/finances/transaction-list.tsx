@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { convertCentsToDecimal } from '@/lib/formatters';
+import { Transaction } from '@/types/transactions';
 import {
   Table,
   TableBody,
@@ -32,16 +34,6 @@ import {
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-interface Transaction {
-  id: number;
-  amount: number;
-  description: string;
-  category: string;
-  date: string;
-  type: 'income' | 'expense';
-  sessionId?: number;
-}
-
 interface TransactionListProps {
   transactions: Transaction[];
 }
@@ -57,11 +49,13 @@ const TransactionList = ({ transactions }: TransactionListProps) => {
   const [selectedDateRange, setSelectedDateRange] = useState<string>('all');
 
   // Formatação de valores monetários
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amountInCents: number) => {
+    // Converter centavos para reais ANTES de formatar
+    const amountInReais = convertCentsToDecimal(amountInCents);
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-    }).format(amount);
+    }).format(amountInReais);
   };
 
   useEffect(() => {

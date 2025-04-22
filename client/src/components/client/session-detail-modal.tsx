@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, MapPin, DollarSign, Camera, User, Info } from 'lucide-react';
+import { formatPriceBRL } from '@/lib/formatters';
 
 interface Session {
   id: number;
@@ -76,7 +77,7 @@ const getStatusBadge = (status: string) => {
     if (typeof amount !== 'number' || isNaN(amount)) {
       return 'R$ --,--';
     }
-    return `R$ ${(amount / 100).toFixed(2).replace('.', ',')}`;
+    return formatPriceBRL(amount);
   };
 // --- Fim das funções de formatação ---
 

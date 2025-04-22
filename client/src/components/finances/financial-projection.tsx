@@ -25,17 +25,8 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TrendingUp } from 'lucide-react';
-
-interface Transaction {
-  id: number;
-  userId: number;
-  sessionId?: number;
-  amount: number;
-  description: string;
-  category: string;
-  date: string;
-  type: 'income' | 'expense';
-}
+import { convertCentsToDecimal } from '@/lib/formatters';
+import { Transaction } from '@/types/transactions';
 
 interface Session {
   id: number;
@@ -128,9 +119,9 @@ const FinancialProjection: React.FC<FinancialProjectionProps> = ({
       const monthIndex = getMonth(txDate);
       
       if (transaction.type === 'income') {
-        monthlyData[monthIndex].actualIncome += transaction.amount;
+        monthlyData[monthIndex].actualIncome += convertCentsToDecimal(transaction.amount);
       } else {
-        monthlyData[monthIndex].actualExpense += Math.abs(transaction.amount);
+        monthlyData[monthIndex].actualExpense += convertCentsToDecimal(Math.abs(transaction.amount));
       }
       
       // Atualizar lucro real
@@ -159,7 +150,7 @@ const FinancialProjection: React.FC<FinancialProjectionProps> = ({
         const monthIndex = getMonth(sessionDate);
         
         // Adicionar receita da sessão
-        monthlyData[monthIndex].actualIncome += session.amountPaid;
+        monthlyData[monthIndex].actualIncome += convertCentsToDecimal(session.amountPaid);
         
         // Atualizar lucro real
         monthlyData[monthIndex].actualProfit = 

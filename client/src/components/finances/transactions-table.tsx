@@ -27,6 +27,7 @@ import {
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
+import { convertCentsToDecimal } from '@/lib/formatters';
 
 export interface Transaction {
   id: string;
@@ -84,11 +85,11 @@ export default function TransactionsTable({
 
   // Função para formatação de valor monetário
   const formatCurrency = (amount: number) => {
-    const absAmount = Math.abs(amount / 100); // converter centavos para reais
+    // Usar função auxiliar para converter centavos para reais
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-    }).format(absAmount);
+    }).format(convertCentsToDecimal(amount));
   };
 
   // Ordenação de transações
