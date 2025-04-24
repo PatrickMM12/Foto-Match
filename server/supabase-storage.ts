@@ -719,9 +719,25 @@ export class SupabaseStorage implements IStorage {
     
     console.log(`Buscando sessões para ${userType} com ID ${userId}`);
     
+    // Modificação: Ajustar o select para buscar o nome do cliente ou fotógrafo
+    // Se o userType for 'photographer', buscamos o nome do cliente (clientId)
+    // Se o userType for 'client', buscamos o nome do fotógrafo (photographerId)
+    // Assumindo que a tabela de usuários se chama 'users' e tem a coluna 'name'
+    const selectQuery = userType === 'photographer'
+      ? `
+          *,
+          client:users!sessions_client_id_fkey ( id, name, email ),
+          photographer:users!sessions_photographer_id_fkey ( id, name ) 
+        `
+      : `
+          *,
+          client:users!sessions_client_id_fkey ( id, name, email ),
+          photographer:users!sessions_photographer_id_fkey ( id, name )
+        `;
+        
     const { data, error } = await supabase
       .from('sessions')
-      .select('*')
+      .select(selectQuery) // Usando a query modificada
       .eq(field, userId);
     
     if (error) {
@@ -734,8 +750,11 @@ export class SupabaseStorage implements IStorage {
       return [];
     }
     
-    // Converter os campos de snake_case para camelCase
+    // Converter os campos de snake_case para camelCase e extrair nomes
     const sessions = data.map(session => {
+      const clientData = session.client as { id: number; name: string; email: string } | null;
+      const photographerData = session.photographer as { id: number; name: string } | null;
+      
       const formattedSession: any = {
         id: session.id,
         photographerId: session.photographer_id,
@@ -756,13 +775,17 @@ export class SupabaseStorage implements IStorage {
         additionalPhotoPrice: session.additional_photo_price,
         paymentStatus: session.payment_status,
         amountPaid: session.amount_paid,
-        createdAt: session.created_at
+        createdAt: session.created_at,
+        // Adicionar os nomes extraídos
+        clientName: clientData?.name || undefined, // Adiciona clientName
+        clientEmail: clientData?.email || undefined, // Adiciona clientEmail
+        photographerName: photographerData?.name || undefined // Adiciona photographerName (útil para a visão do cliente)
       };
       
       return formattedSession;
     });
     
-    console.log(`Retornando ${sessions.length} sessões convertidas`);
+    console.log(`Retornando ${sessions.length} sessões convertidas com nomes`);
     
     return sessions as Session[];
   }

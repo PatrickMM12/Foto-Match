@@ -380,7 +380,7 @@ const PhotographerFinances = () => {
             <div>
               <h4 className="font-medium text-base">{session.title}</h4>
               <p className="text-sm text-muted-foreground">
-                {session.clientName || `Cliente #${session.id}`}
+                {session.clientName || `Cliente #${session.clientId}`}
               </p>
               <div className="flex items-center mt-1">
                 <Calendar className="h-3 w-3 mr-1 text-muted-foreground" />
@@ -540,7 +540,7 @@ const PhotographerFinances = () => {
                     <div>
                       <p className="font-medium">{session.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        Cliente: {session.clientName || `ID: ${session.id}`}
+                        Cliente: {session.clientName || `ID: ${session.clientId}`}
                       </p>
                     </div>
                     <div className="flex items-center gap-4">
@@ -754,7 +754,7 @@ const PhotographerFinances = () => {
                               <div>
                                 <h4 className="font-medium">{session.title}</h4>
                                 <p className="text-sm text-muted-foreground">
-                                  Cliente: {session.clientName || `ID: ${session.id}`}
+                                  Cliente: {session.clientName || `ID: ${session.clientId}`}
                                 </p>
                                 <div className="flex items-center mt-1">
                                   <Calendar className="h-3 w-3 mr-1 text-muted-foreground" />

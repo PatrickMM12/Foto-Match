@@ -38,6 +38,7 @@ interface Session {
   amountPaid: number;
   clientId: number;
   clientName?: string;
+  clientEmail?: string;
   photographerId: number;
   serviceId: number;
   createdAt: string;

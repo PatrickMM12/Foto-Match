@@ -138,8 +138,21 @@ const SessionForm: React.FC<SessionFormProps> = ({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="flex flex-wrap gap-2 items-center mb-4">
-          <h3 className="text-lg font-semibold">Detalhes da Sessão</h3>
           {isEditing && getStatusBadge(session.status)}
+        </div>
+        
+        {/* Informações do Cliente */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-gray-50 rounded-md mb-6">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">Cliente</p>
+            <p className="font-medium">{session.clientName || `ID: ${session.clientId}`}</p>
+          </div>
+          {session.clientEmail && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Email</p>
+              <p className="font-medium">{session.clientEmail}</p>
+            </div>
+          )}
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
