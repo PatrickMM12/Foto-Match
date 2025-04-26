@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 import LoadingSpinner from '@/components/shared/loading-spinner';
 import PhotoGallery from '@/components/shared/photo-gallery';
 import BookingForm from '@/components/client/booking-form';
@@ -53,6 +54,7 @@ const PhotographerDetail = () => {
   const { id } = useParams();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { isAuthenticated, user } = useAuth();
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
   
   // Fetch photographer data
@@ -187,6 +189,27 @@ const PhotographerDetail = () => {
     );
   };
   
+  const handleOpenBookingDialog = () => {
+    if (isAuthenticated) {
+      if (user?.userType === 'client') {
+         setIsBookingDialogOpen(true);
+      } else {
+         toast({
+            title: "Ação não permitida",
+            description: "Apenas clientes podem agendar sessões.",
+            variant: "destructive",
+         });
+      }
+    } else {
+      navigate(`/login?redirect=/photographer/${id}`);
+      toast({
+        title: "Login Necessário",
+        description: "Você precisa estar logado como cliente para agendar uma sessão.",
+        variant: "default",
+      });
+    }
+  };
+  
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
       {/* Header/Cover */}
@@ -225,7 +248,11 @@ const PhotographerDetail = () => {
                   </div>
                   
                   <div className="w-full mt-6">
-                    <Button className="w-full" onClick={() => setIsBookingDialogOpen(true)}>
+                    <Button 
+                      className="w-full" 
+                      onClick={handleOpenBookingDialog}
+                      disabled={isAuthenticated && user?.userType !== 'client'}
+                    >
                       Agendar Sessão
                     </Button>
                   </div>
@@ -464,21 +491,22 @@ const PhotographerDetail = () => {
       
       {/* Booking Dialog */}
       <Dialog open={isBookingDialogOpen} onOpenChange={setIsBookingDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Agendar Sessão com {name}</DialogTitle>
           </DialogHeader>
-          <BookingForm
-            photographerId={parseInt(id!)}
-            services={services}
-            onBookingComplete={() => {
-              setIsBookingDialogOpen(false);
-              toast({
-                title: 'Sessão agendada!',
-                description: 'Sua solicitação foi enviada ao fotógrafo.',
-              });
-            }}
-          />
+          {services.length > 0 && (
+             <BookingForm 
+                photographerId={parseInt(id || '0')} 
+                services={services} 
+                onBookingComplete={() => setIsBookingDialogOpen(false)} 
+             />
+          )}
+          {services.length === 0 && (
+             <p className="text-center py-4 text-muted-foreground">
+               {"Este fotógrafo não possui serviços disponíveis para agendamento."}
+             </p>
+          )}
         </DialogContent>
       </Dialog>
     </div>

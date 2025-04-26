@@ -104,7 +104,7 @@ const HowItWorksSection = () => {
                 </div>
               </div>
               
-              <Link href="/register">
+              <Link href="/client/search">
                 <Button className="w-full mt-8 bg-orange-500 hover:bg-orange-600">Encontrar Fotógrafos</Button>
               </Link>
             </CardContent>

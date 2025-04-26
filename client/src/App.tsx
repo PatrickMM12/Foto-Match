@@ -29,13 +29,17 @@ function App() {
   // Redirecionar para login quando o usuário tentar acessar páginas protegidas sem estar autenticado
   useEffect(() => {
     if (!isLoading && !user) {
-      if (
-        location.startsWith('/photographer/') ||
-        location.startsWith('/client/')
-      ) {
-        console.log('Tentativa de acesso a rota protegida sem autenticação, redirecionando para login');
+       // Verificar rotas de fotógrafo
+       if (location.startsWith('/photographer/')) {
+         console.log('Tentativa de acesso a /photographer/* sem autenticação, redirecionando para login');
+         setLocation('/login');
+         return; // Sair após redirecionar
+       }
+       // Verificar rotas de cliente, *exceto* /client/search
+       if (location.startsWith('/client/') && location !== '/client/search') {
+        console.log(`Tentativa de acesso a ${location} sem autenticação, redirecionando para login`);
         setLocation('/login');
-      }
+       }
     }
   }, [location, user, isLoading, setLocation]);
 
@@ -75,9 +79,7 @@ function App() {
         </Route>
 
         {/* Client Routes */}
-        <Route path="/client/search">
-          {isLoggedIn && isClient ? <ClientSearch /> : <Login />}
-        </Route>
+        <Route path="/client/search" component={ClientSearch} />
         <Route path="/client/profile">
           {isLoggedIn && isClient ? <ClientProfile /> : <Login />}
         </Route>
