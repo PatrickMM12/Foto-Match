@@ -6,7 +6,8 @@ import {
   transactions, Transaction, InsertTransaction,
   reviews, Review, InsertReview,
   portfolioItems, PortfolioItem, InsertPortfolioItem,
-  UserWithProfile
+  UserWithProfile,
+  photographerServiceAreas, PhotographerServiceArea, InsertPhotographerServiceArea
 } from "@shared/schema";
 
 import { supabaseStorage } from './supabase-storage';
@@ -62,6 +63,15 @@ export interface IStorage {
 
   // Search
   searchPhotographers(query: string, lat?: number, lng?: number, radius?: number): Promise<UserWithProfile[]>;
+  searchPhotographersByLocation(params: { city?: string, state?: string, country?: string, lat?: number, lng?: number, radius?: number, query?: string }): Promise<UserWithProfile[]>;
+
+  // Photographer Service Areas
+  getServiceAreas(userId: number): Promise<PhotographerServiceArea[]>;
+  addServiceArea(area: InsertPhotographerServiceArea): Promise<PhotographerServiceArea>;
+  deleteServiceArea(id: number, userId: number): Promise<boolean>;
+
+  // Get distinct specialties
+  getDistinctSpecialties(): Promise<string[]>;
 }
 
 // Exportar a implementação do Supabase como padrão
@@ -75,6 +85,7 @@ export class MemStorage implements IStorage {
   private transactions: Map<number, Transaction>;
   private reviews: Map<number, Review>;
   private portfolioItems: Map<number, PortfolioItem>;
+  private photographerServiceAreas: Map<number, PhotographerServiceArea>;
   currentId: {
     users: number;
     photographerProfiles: number;
@@ -83,6 +94,7 @@ export class MemStorage implements IStorage {
     transactions: number;
     reviews: number;
     portfolioItems: number;
+    photographerServiceAreas: number;
   };
 
   constructor() {
@@ -93,6 +105,7 @@ export class MemStorage implements IStorage {
     this.transactions = new Map();
     this.reviews = new Map();
     this.portfolioItems = new Map();
+    this.photographerServiceAreas = new Map();
     this.currentId = {
       users: 1,
       photographerProfiles: 1,
@@ -101,6 +114,7 @@ export class MemStorage implements IStorage {
       transactions: 1,
       reviews: 1,
       portfolioItems: 1,
+      photographerServiceAreas: 1,
     };
   }
 
@@ -333,57 +347,77 @@ export class MemStorage implements IStorage {
     return this.portfolioItems.delete(id);
   }
 
-  // Search photographers
+  // Search
   async searchPhotographers(query: string, lat?: number, lng?: number, radius: number = 50): Promise<UserWithProfile[]> {
-    // Get all users that are photographers
-    const photographers = Array.from(this.users.values()).filter(
-      (user) => user.userType === "photographer"
-    );
+    // NOTE: This MemStorage implementation might be basic or incomplete
+    let filteredUsers = Array.from(this.users.values())
+                           .filter(user => user.userType === 'photographer');
 
-    // Filter by query if provided
-    let results = photographers;
     if (query) {
-      const queryLower = query.toLowerCase();
-      results = results.filter(
-        (user) => 
-          user.name.toLowerCase().includes(queryLower) ||
-          (user.bio && user.bio.toLowerCase().includes(queryLower)) ||
-          (user.location && user.location.toLowerCase().includes(queryLower))
-      );
+        const lowerQuery = query.toLowerCase();
+        filteredUsers = filteredUsers.filter(user => 
+            user.name.toLowerCase().includes(lowerQuery) || 
+            user.bio?.toLowerCase().includes(lowerQuery)
+            // Add search in specialties if needed (requires fetching profile)
+        );
+    }
+    
+    // Basic distance calculation (needs refinement for real-world use)
+    if (lat !== undefined && lng !== undefined && radius > 0) {
+        filteredUsers = filteredUsers.filter(user => {
+            if (user.latitude && user.longitude) {
+                const distance = this.calculateDistance(lat, lng, user.latitude, user.longitude);
+                return distance <= radius;
+            }
+            return false;
+        });
     }
 
-    // Calculate distance if lat/lng provided
-    if (lat && lng) {
-      results = results.filter(user => {
-        if (!user.latitude || !user.longitude) return false;
-        
-        // Rough distance calculation using Haversine formula
-        const R = 6371; // Earth radius in km
-        const dLat = this.degToRad(user.latitude - lat);
-        const dLng = this.degToRad(user.longitude - lng);
-        const a = 
-          Math.sin(dLat/2) * Math.sin(dLat/2) +
-          Math.cos(this.degToRad(lat)) * Math.cos(this.degToRad(user.latitude)) * 
-          Math.sin(dLng/2) * Math.sin(dLng/2); 
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-        const distance = R * c;
-        
-        return distance <= radius;
-      });
-    }
-
-    // Fetch photographer profiles for all results
-    const resultsWithProfiles = await Promise.all(
-      results.map(async (user) => {
+    const resultsWithProfiles = await Promise.all(filteredUsers.map(async (user) => {
         const profile = await this.getPhotographerProfile(user.id);
         return { ...user, photographerProfile: profile };
-      })
-    );
+    }));
 
     return resultsWithProfiles;
   }
+  
+  // Implementações obrigatórias pela interface IStorage, mas não funcionais em MemStorage
+  async searchPhotographersByLocation(params: { city?: string, state?: string, country?: string, lat?: number, lng?: number, radius?: number, query?: string }): Promise<UserWithProfile[]> {
+    throw new Error("searchPhotographersByLocation not implemented in MemStorage.");
+  }
+
+  async getServiceAreas(userId: number): Promise<PhotographerServiceArea[]> {
+    throw new Error("getServiceAreas not implemented in MemStorage.");
+  }
+
+  async addServiceArea(area: InsertPhotographerServiceArea): Promise<PhotographerServiceArea> {
+     throw new Error("addServiceArea not implemented in MemStorage.");
+  }
+
+  async deleteServiceArea(id: number, userId: number): Promise<boolean> {
+      throw new Error("deleteServiceArea not implemented in MemStorage.");
+  }
+
+  // Helper for distance calculation (Haversine formula)
+  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+      const R = 6371; // Radius of the Earth in km
+      const dLat = this.degToRad(lat2 - lat1);
+      const dLon = this.degToRad(lon2 - lon1);
+      const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(this.degToRad(lat1)) * Math.cos(this.degToRad(lat2)) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c; // Distance in km
+      return distance;
+  }
 
   private degToRad(deg: number): number {
-    return deg * (Math.PI/180);
+    return deg * (Math.PI / 180);
+  }
+
+  // Get distinct specialties
+  async getDistinctSpecialties(): Promise<string[]> {
+    throw new Error("getDistinctSpecialties not implemented in MemStorage.");
   }
 }

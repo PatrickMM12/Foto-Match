@@ -6,7 +6,8 @@ import {
   transactions, Transaction, InsertTransaction,
   reviews, Review, InsertReview,
   portfolioItems, PortfolioItem, InsertPortfolioItem,
-  UserWithProfile
+  UserWithProfile,
+  photographerServiceAreas, PhotographerServiceArea, InsertPhotographerServiceArea
 } from "@shared/schema";
 import { IStorage } from "./storage";
 import { supabase } from "./supabase";
@@ -1266,57 +1267,175 @@ export class SupabaseStorage implements IStorage {
     return !error;
   }
 
-  // Search photographers
+  // Search Methods
   async searchPhotographers(query: string, lat?: number, lng?: number, radius: number = 50): Promise<UserWithProfile[]> {
-    // Construir a consulta base
-    let supabaseQuery = supabase
+    console.warn("searchPhotographers (original by user location) called. Consider using searchPhotographersByLocation.");
+    let queryBuilder = supabase
       .from('users')
+      .select(`*, photographerProfile:photographer_profiles(*)`)
+      .eq('user_type', 'photographer');
+      
+    if (query) { 
+        const textQuery = `%${query}%`;
+        queryBuilder = queryBuilder.or(`name.ilike.${textQuery},bio.ilike.${textQuery},location.ilike.${textQuery}`);
+     }
+     
+    if (lat !== undefined && lng !== undefined && radius > 0) { 
+        try {
+            const { data: nearbyUsers, error: rpcError } = await supabase.rpc('nearby_users', {
+              lat: lat, long: lng, dist: radius * 1000 
+            });
+            if (rpcError) { console.error('nearby_users RPC Error:', rpcError); /* Handle */ }
+            else if (nearbyUsers) {
+              const nearbyUserIds = nearbyUsers.map((u: any) => u.id);
+              if(nearbyUserIds.length > 0) queryBuilder = queryBuilder.in('id', nearbyUserIds); 
+              else return []; // No nearby users found
+            } else { return []; }
+          } catch (rpcError) { console.error('nearby_users RPC Exception:', rpcError); /* Handle */ }
+    }
+    
+    const { data, error } = await queryBuilder;
+    if (error) { console.error("Search Error:", error); return []; }
+    
+    // Complete mapping logic
+    const results = data?.map((d: any) => ({
+        ...d,
+        userType: d.user_type, // Map snake_case to camelCase
+        photographerProfile: d.photographerProfile ? {
+            ...d.photographerProfile,
+            // Map snake_case fields from photographer_profiles if necessary
+            userId: d.photographerProfile.user_id,
+            instagramUsername: d.photographerProfile.instagram_username,
+            yearsOfExperience: d.photographerProfile.years_of_experience,
+            equipmentDescription: d.photographerProfile.equipment_description,
+            portfolioImages: d.photographerProfile.portfolio_images,
+            availableTimes: d.photographerProfile.available_times,
+        } : undefined,
+    })) || [];
+    return results as UserWithProfile[]; // Type assertion should be safe now
+  }
+
+  async searchPhotographersByLocation(params: { city?: string, state?: string, country?: string, lat?: number, lng?: number, radius?: number, query?: string }): Promise<UserWithProfile[]> {
+    try {
+      let queryBuilder = supabase
+        .from('photographer_service_areas')
+        // Ensure all needed fields from user and profile are selected
+        .select(`
+           user:users!inner (
+            id,
+            auth_id,
+            email,
+            name,
+            user_type,
+            phone,
+            avatar,
+            bio,
+            location,
+            latitude,
+            longitude,
+            createdAt,
+            photographerProfile:photographer_profiles!inner(*)
+          )
+        `, { distinct: 'user.id' } as any);
+      
+      // Location Filter (RPC or Text)
+      if (params.lat !== undefined && params.lng !== undefined && params.radius !== undefined && params.radius > 0) {
+         try {
+           const { data: nearbyAreas, error: rpcError } = await supabase.rpc('nearby_photographer_service_areas', {
+             lat: params.lat, long: params.lng, dist: params.radius * 1000 
+           });
+           if (rpcError) { console.error('nearby_photographer_service_areas RPC Error:', rpcError); /* Handle */ }
+           else if (nearbyAreas) {
+             const nearbyAreaIds = nearbyAreas.map((a: any) => a.id);
+             if (nearbyAreaIds.length > 0) { queryBuilder = queryBuilder.in('id', nearbyAreaIds); } 
+             else { return []; }
+           } else { return []; }
+         } catch (rpcError) { console.error('nearby_photographer_service_areas RPC Exception:', rpcError); return []; }
+      } else if (params.city) {
+        queryBuilder = queryBuilder.ilike('city', `%${params.city}%`);
+        if (params.state) { queryBuilder = queryBuilder.ilike('state', `%${params.state}%`); }
+        if (params.country) { queryBuilder = queryBuilder.ilike('country', `%${params.country}%`); }
+      } else {
+        console.warn("Search without valid location params.");
+        return [];
+      }
+
+      // Text Filter (User)
+      if (params.query) {
+         const textQuery = `%${params.query}%`;
+          queryBuilder = queryBuilder.or(`user.name.ilike.${textQuery},user.bio.ilike.${textQuery}`);
+          // TODO: Filter by specialties if needed
+      }
+
+      const { data: resultData, error } = await queryBuilder;
+      if (error) { console.error("Search By Location Error:", error); return []; }
+
+      // Complete mapping logic
+      const photographers = resultData?.map((item: any) => {
+          const user = item.user;
+          const profile = user.photographerProfile;
+          // Need to return the correct structure matching UserWithProfile
+          return {
+              ...user,
+              userType: user.user_type,
+              photographerProfile: profile ? {
+                  ...profile,
+                  // Map snake_case from photographer_profiles
+                  userId: profile.user_id,
+                  instagramUsername: profile.instagram_username,
+                  yearsOfExperience: profile.years_of_experience,
+                  equipmentDescription: profile.equipment_description,
+                  portfolioImages: profile.portfolio_images,
+                  availableTimes: profile.available_times,
+              } : undefined,
+          };
+      }) || [];
+      return photographers as UserWithProfile[]; // Type assertion should be safe now
+    } catch (err) { console.error("Unexpected Search By Location Error:", err); return []; }
+  }
+
+  // Photographer Service Area Methods
+  async getServiceAreas(userId: number): Promise<PhotographerServiceArea[]> {
+    const { data, error } = await supabase
+      .from('photographer_service_areas')
       .select('*')
-      .eq('userType', 'photographer');
+      .eq('user_id', userId);
+    if (error) { console.error("Error fetching service areas:", error); return []; }
+    return data || [];
+  }
 
-    // Adicionar filtro de pesquisa se fornecido
-    if (query) {
-      const queryLower = query.toLowerCase();
-      supabaseQuery = supabaseQuery.or(
-        `name.ilike.%${queryLower}%,bio.ilike.%${queryLower}%,location.ilike.%${queryLower}%`
-      );
-    }
+  async addServiceArea(area: InsertPhotographerServiceArea): Promise<PhotographerServiceArea> {
+    if (!area.userId) { throw new Error("User ID is required."); }
+    const { data, error } = await supabase
+      .from('photographer_service_areas')
+      .insert({ user_id: area.userId, city: area.city, state: area.state, country: area.country, latitude: area.latitude, longitude: area.longitude })
+      .select()
+      .single();
+    if (error) { console.error("Error adding service area:", error); throw error; }
+    if (!data) { throw new Error("No data returned after insert."); }
+    return data as PhotographerServiceArea;
+  }
 
-    // Executar a consulta
-    const { data, error } = await supabaseQuery;
-    
-    if (error || !data) return [];
-    
-    // Filtrar por distância se lat/lng fornecidos
-    let results = data as User[];
-    if (lat && lng) {
-      results = results.filter(user => {
-        if (!user.latitude || !user.longitude) return false;
-        
-        // Cálculo aproximado de distância usando a fórmula de Haversine
-        const R = 6371; // Raio da Terra em km
-        const dLat = this.degToRad(user.latitude - lat);
-        const dLng = this.degToRad(user.longitude - lng);
-        const a = 
-          Math.sin(dLat/2) * Math.sin(dLat/2) +
-          Math.cos(this.degToRad(lat)) * Math.cos(this.degToRad(user.latitude)) * 
-          Math.sin(dLng/2) * Math.sin(dLng/2); 
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-        const distance = R * c;
-        
-        return distance <= radius;
-      });
-    }
-
-    // Buscar perfis de fotógrafo para todos os resultados
-    const resultsWithProfiles = await Promise.all(
-      results.map(async (user) => {
-        const profile = await this.getPhotographerProfile(user.id);
-        return { ...user, photographerProfile: profile };
-      })
-    );
-
-    return resultsWithProfiles;
+  async deleteServiceArea(id: number, userId: number): Promise<boolean> {
+     const { error } = await supabase
+      .from('photographer_service_areas')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId); 
+    if (error) { console.error("Error deleting service area:", error); return false; }
+    return true;
+  }
+  
+  // Get Distinct Specialties Method
+  async getDistinctSpecialties(): Promise<string[]> {
+      try {
+          const { data, error } = await supabase.rpc('get_distinct_specialties');
+          if (error) { console.error("Error fetching distinct specialties via RPC:", error); return []; }
+          return data ? data.map((item: any) => item.specialty).sort() : [];
+      } catch (err) {
+          console.error("Error fetching distinct specialties:", err);
+          return [];
+      }
   }
 
   // Método para buscar todos os usuários do tipo client

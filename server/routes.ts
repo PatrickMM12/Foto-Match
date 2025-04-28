@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { userRegisterSchema, userLoginSchema, insertPhotographerProfileSchema, insertServiceSchema, insertSessionSchema, insertTransactionSchema, insertReviewSchema, insertPortfolioItemSchema } from "@shared/schema";
+import { userRegisterSchema, userLoginSchema, insertPhotographerProfileSchema, insertServiceSchema, insertSessionSchema, insertTransactionSchema, insertReviewSchema, insertPortfolioItemSchema, insertPhotographerServiceAreaSchema } from "@shared/schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { supabase } from "./supabase";
@@ -19,34 +19,31 @@ declare global {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Middleware para verificar autenticação com Supabase
   const isAuthenticated = async (req: Request, res: Response, next: Function) => {
-    // Verificar se o token de autenticação está presente no cabeçalho
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: "Unauthorized" });
+      return res.status(401).json({ message: "Unauthorized" }); // Ensure return
     }
-
     const token = authHeader.split(' ')[1];
-    
     try {
-      // Verificar o token com o Supabase
       const { data, error } = await supabase.auth.getUser(token);
-      
       if (error || !data.user) {
-        return res.status(401).json({ message: "Unauthorized" });
+        return res.status(401).json({ message: "Unauthorized" }); // Ensure return
       }
-      
-      // Buscar o usuário no banco de dados
-      const user = await storage.getUserByEmail(data.user.email || '');
+      const userEmail = data.user.email;
+      if (!userEmail) {
+        return res.status(401).json({ message: "User email not found in token" }); // Ensure return
+      }
+      const user = await storage.getUserByEmail(userEmail);
       if (!user) {
-        return res.status(401).json({ message: "User not found" });
+        console.warn(`User authenticated (${userEmail}) but not found in DB.`);
+        return res.status(401).json({ message: "User not found in application database" }); // Ensure return
       }
-      
-      // Adicionar o usuário ao objeto de requisição
       req.user = user;
-      next();
+      next(); // Call next on success
+      // Implicit void return here is fine
     } catch (error) {
       console.error('Authentication error:', error);
-      return res.status(401).json({ message: "Authentication error" });
+      return res.status(500).json({ message: "Authentication error" }); // Ensure return
     }
   };
   
@@ -70,6 +67,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
+  const isPhotographer = (req: Request, res: Response, next: Function) => {
+    if (!req.user || req.user.userType !== 'photographer') {
+      return res.status(403).json({ message: "Forbidden: Requires photographer privileges" });
+    }
+    next();
+  };
 
   // Routes
   app.post("/api/auth/register", async (req, res) => {
@@ -1656,6 +1659,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: error instanceof Error ? error.message : String(error) 
       });
     }
+  });
+
+  // Photographer Service Area routes
+  app.get("/api/photographers/service-areas", isAuthenticated, isPhotographer, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const serviceAreas = await storage.getServiceAreas(userId);
+      res.json(serviceAreas);
+    } catch (error: any) {
+      console.error("Error fetching service areas:", error);
+      res.status(500).json({ message: "Server error fetching service areas", details: error.message });
+    }
+  });
+
+  app.post("/api/photographers/service-areas", isAuthenticated, isPhotographer, async (req, res) => {
+    try {
+      // Validate request body
+      const validatedData = insertPhotographerServiceAreaSchema.parse(req.body);
+      const userId = req.user!.id;
+
+      // TODO: Consider adding geocoding here if lat/lng are not provided
+      // e.g., using a geocoding service based on city/state/country
+      // For now, assumes lat/lng might be optional or handled by client/DB
+
+      const newArea = await storage.addServiceArea({
+        ...validatedData,
+        userId: userId, // Ensure the logged-in user's ID is used
+      });
+      res.status(201).json(newArea);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ message: fromZodError(error).message });
+      }
+      console.error("Error adding service area:", error);
+      // Handle potential duplicate errors from storage if necessary
+      res.status(500).json({ message: "Server error adding service area", details: error.message });
+    }
+  });
+
+  app.delete("/api/photographers/service-areas/:id", isAuthenticated, isPhotographer, async (req, res) => {
+    try {
+      const areaId = parseInt(req.params.id, 10);
+      const userId = req.user!.id;
+
+      if (isNaN(areaId)) {
+        return res.status(400).json({ message: "Invalid area ID" });
+      }
+
+      const success = await storage.deleteServiceArea(areaId, userId);
+
+      if (success) {
+        res.status(204).send(); // No Content
+      } else {
+        // Could be because the area doesn't exist or doesn't belong to the user
+        res.status(404).json({ message: "Service area not found or not owned by user" }); 
+      }
+    } catch (error: any) {
+      console.error("Error deleting service area:", error);
+      res.status(500).json({ message: "Server error deleting service area", details: error.message });
+    }
+  });
+
+  // Search routes
+  app.get("/api/search/photographers-by-location", async (req, res) => {
+    try {
+      const { city, state, country, lat, lng, radius, query, specialties } = req.query;
+
+      const params: any = {};
+      if (city) params.city = String(city);
+      if (state) params.state = String(state);
+      if (country) params.country = String(country);
+      if (lat) params.lat = parseFloat(String(lat));
+      if (lng) params.lng = parseFloat(String(lng));
+      if (radius) params.radius = parseFloat(String(radius));
+      if (query) params.query = String(query);
+      // Process specialties: split comma-separated string into array, trim whitespace
+      if (specialties && typeof specialties === 'string') {
+          params.specialties = specialties.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      } else if (Array.isArray(specialties)) {
+           // Handle if it somehow arrives as an array already
+          params.specialties = specialties.map(s => String(s).trim()).filter(s => s.length > 0);
+      }
+
+      // ... existing validation for lat/lng/radius ...
+      if ((params.lat !== undefined || params.lng !== undefined || params.radius !== undefined) &&
+          (params.lat === undefined || params.lng === undefined || params.radius === undefined || isNaN(params.lat) || isNaN(params.lng) || isNaN(params.radius) || params.radius <= 0)) {
+           return res.status(400).json({ message: "Invalid or incomplete lat/lng/radius parameters provided." });
+      }
+      
+      const photographers = await storage.searchPhotographersByLocation(params);
+      res.json(photographers);
+
+    } catch (error: any) {
+      console.error("Error searching photographers by location:", error);
+      res.status(500).json({ message: "Server error searching photographers by location", details: error.message });
+    }
+  });
+
+  // --- Specialties Route (NEW) ---
+  app.get("/api/specialties", async (req, res) => {
+      try {
+          const specialties = await storage.getDistinctSpecialties();
+          res.json(specialties);
+      } catch (error: any) {
+          console.error("Error fetching distinct specialties:", error);
+          res.status(500).json({ message: "Server error fetching specialties", details: error.message });
+      }
   });
 
   const server = createServer(app);

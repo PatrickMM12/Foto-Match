@@ -104,6 +104,18 @@ export const portfolioItems = pgTable("portfolio_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Photographer service areas
+export const photographerServiceAreas = pgTable("photographer_service_areas", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  city: text("city").notNull(),
+  state: text("state"),
+  country: text("country"),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert Schemas
 
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -158,6 +170,11 @@ export const insertPortfolioItemSchema = createInsertSchema(portfolioItems).omit
   createdAt: true
 });
 
+export const insertPhotographerServiceAreaSchema = createInsertSchema(photographerServiceAreas).omit({
+  id: true,
+  createdAt: true
+});
+
 // Types
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -180,6 +197,9 @@ export type Review = typeof reviews.$inferSelect;
 
 export type InsertPortfolioItem = z.infer<typeof insertPortfolioItemSchema>;
 export type PortfolioItem = typeof portfolioItems.$inferSelect;
+
+export type InsertPhotographerServiceArea = z.infer<typeof insertPhotographerServiceAreaSchema>;
+export type PhotographerServiceArea = typeof photographerServiceAreas.$inferSelect;
 
 // Register and Login schemas
 
