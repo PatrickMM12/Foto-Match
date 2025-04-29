@@ -85,7 +85,7 @@ const ClientSearch = () => {
         return [];
       } 
       
-      const searchParams = new URLSearchParams();
+  const searchParams = new URLSearchParams();
       
       if (selectedLocationDetails.latitude && selectedLocationDetails.longitude) {
         searchParams.append('lat', selectedLocationDetails.latitude.toString());
@@ -148,7 +148,7 @@ const ClientSearch = () => {
     setSearchTrigger(prev => prev + 1);
     refetch();
   }, [selectedLocationDetails, textSearchTerm, selectedSpecialties, refetch]);
-
+  
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     triggerSearch();
@@ -189,15 +189,15 @@ const ClientSearch = () => {
                   
                   <div className="space-y-1.5">
                     <label htmlFor="searchTerm" className="text-sm font-medium">Busca Adicional (Opcional)</label>
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
                         id="searchTerm"
                         placeholder="Nome, especialidade..."
                         value={textSearchTerm}
                         onChange={(e) => setTextSearchTerm(e.target.value)}
-                        className="pl-8"
-                      />
+                      className="pl-8"
+                    />
                     </div>
                   </div>
                   
@@ -220,7 +220,7 @@ const ClientSearch = () => {
                               </Label>
                             </div>
                           ))}
-                        </div>
+                    </div>
                       </ScrollArea>
                     ) : (
                       <p className="text-sm text-muted-foreground italic">Nenhuma especialidade encontrada.</p>
@@ -307,11 +307,11 @@ const ClientSearch = () => {
             <Card className="h-[calc(100vh-12rem)] sticky top-8">
               <CardContent className="p-0 h-full">
                 {mapCenter.lat && mapCenter.lng ? (
-                  <PhotographerMap 
+                <PhotographerMap 
                     center={mapCenter}
-                    photographers={photographers || []} 
-                    onMarkerClick={handleViewPhotographer}
-                  />
+                  photographers={photographers || []} 
+                  onMarkerClick={handleViewPhotographer}
+                />
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
                     Carregando mapa...

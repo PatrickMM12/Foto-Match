@@ -98,6 +98,7 @@ type ServiceAreaFormValues = z.infer<typeof serviceAreaSchema>;
 
 // Type for data sent to mutation - Ensure optional fields match nullability
 type ServiceAreaMutationPayload = {
+    userId: number;
     city: string;
     state: string | null;
     country: string | null;
@@ -225,9 +226,16 @@ const PhotographerProfile = () => {
   });
 
   const handleAddServiceArea = (values: ServiceAreaFormValues) => {
+    // Certifique-se de que temos os dados do usuário
+    if (!data || !data.id) {
+      toast({ title: 'Erro', description: 'Não foi possível obter o ID do usuário.', variant: 'destructive' });
+      return;
+    }
+
     // Validation should now ensure selectedPlace and selectedPlace.city are valid
     if (values.selectedPlace && values.selectedPlace.city) { 
       const payload: ServiceAreaMutationPayload = {
+        userId: data.id,
         city: values.selectedPlace.city, 
         state: values.selectedPlace.state || null, // Use null instead of undefined
         country: values.selectedPlace.country || null, // Use null instead of undefined
@@ -454,7 +462,7 @@ const PhotographerProfile = () => {
         <PageTitle title="Perfil do Fotógrafo" />
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full md:w-auto grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-6">
             <TabsTrigger value="profile">Informações</TabsTrigger>
             <TabsTrigger value="services">Serviços</TabsTrigger>
             <TabsTrigger value="portfolio">Portfólio</TabsTrigger>

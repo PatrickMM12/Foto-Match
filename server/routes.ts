@@ -38,6 +38,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn(`User authenticated (${userEmail}) but not found in DB.`);
         return res.status(401).json({ message: "User not found in application database" }); // Ensure return
       }
+      // Log antes de chamar next
+      console.log(`[DEBUG] isAuthenticated SUCCESS for path: ${req.path}. User ID: ${user?.id}, Email: ${user?.email}, Type: ${user?.userType}`);
       req.user = user;
       next(); // Call next on success
       // Implicit void return here is fine
@@ -810,11 +812,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user as any;
       const userType = user.userType as 'photographer' | 'client';
+      console.log(`[DEBUG] GET /api/sessions - User ID: ${user.id}, User Type: ${userType}`); // Log na rota
       
       const sessions = await storage.getSessions(user.id, userType);
+      console.log(`[DEBUG] GET /api/sessions - Sessions fetched from storage: ${sessions?.length || 0}`); // Log após buscar
       res.json(sessions);
     } catch (error) {
-      console.error("Error fetching sessions:", error);
+      console.error("[ROUTE] Error fetching sessions:", error);
       res.status(500).json({ message: "Error fetching sessions" });
     }
   });

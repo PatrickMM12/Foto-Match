@@ -718,7 +718,7 @@ export class SupabaseStorage implements IStorage {
   async getSessions(userId: number, userType: 'photographer' | 'client'): Promise<Session[]> {
     const field = userType === 'photographer' ? 'photographer_id' : 'client_id';
     
-    console.log(`Buscando sessões para ${userType} com ID ${userId}`);
+    console.log(`[DEBUG] storage.getSessions - Called for User ID: ${userId}, Type: ${userType}`); // Log de entrada
     
     // Modificação: Ajustar o select para buscar o nome do cliente ou fotógrafo
     // Se o userType for 'photographer', buscamos o nome do cliente (clientId)
@@ -727,13 +727,13 @@ export class SupabaseStorage implements IStorage {
     const selectQuery = userType === 'photographer'
       ? `
           *,
-          client:users!sessions_client_id_fkey ( id, name, email ),
-          photographer:users!sessions_photographer_id_fkey ( id, name ) 
+          client:users!sessions_client_id_users_id_fk ( id, name, email ),
+          photographer:users!sessions_photographer_id_users_id_fk ( id, name )
         `
       : `
           *,
-          client:users!sessions_client_id_fkey ( id, name, email ),
-          photographer:users!sessions_photographer_id_fkey ( id, name )
+          client:users!sessions_client_id_users_id_fk ( id, name, email ),
+          photographer:users!sessions_photographer_id_users_id_fk ( id, name )
         `;
         
     const { data, error } = await supabase
@@ -742,15 +742,18 @@ export class SupabaseStorage implements IStorage {
       .eq(field, userId);
     
     if (error) {
-      console.error("Erro ao buscar sessões:", error);
+      console.error("[STORAGE] Error fetching sessions from Supabase:", error); // Log de erro
       return [];
     }
     
     if (!data || data.length === 0) {
-      console.log(`Nenhuma sessão encontrada para ${userType} com ID ${userId}`);
+      console.log(`[DEBUG] storage.getSessions - No raw sessions found for User ID: ${userId}`); // Log sem dados
       return [];
     }
     
+    console.log(`[DEBUG] storage.getSessions - Raw data count from Supabase: ${data.length}`); // Log dados brutos
+    // console.log(`[DEBUG] storage.getSessions - First raw session data:`, JSON.stringify(data[0], null, 2)); // Descomentar se precisar ver a estrutura bruta
+
     // Converter os campos de snake_case para camelCase e extrair nomes
     const sessions = data.map(session => {
       const clientData = session.client as { id: number; name: string; email: string } | null;
@@ -786,7 +789,7 @@ export class SupabaseStorage implements IStorage {
       return formattedSession;
     });
     
-    console.log(`Retornando ${sessions.length} sessões convertidas com nomes`);
+    console.log(`[DEBUG] storage.getSessions - Mapped sessions count: ${sessions.length}`); // Log após mapear
     
     return sessions as Session[];
   }

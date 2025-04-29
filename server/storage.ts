@@ -359,18 +359,18 @@ export class MemStorage implements IStorage {
             user.name.toLowerCase().includes(lowerQuery) || 
             user.bio?.toLowerCase().includes(lowerQuery)
             // Add search in specialties if needed (requires fetching profile)
-        );
+      );
     }
-    
+
     // Basic distance calculation (needs refinement for real-world use)
     if (lat !== undefined && lng !== undefined && radius > 0) {
         filteredUsers = filteredUsers.filter(user => {
             if (user.latitude && user.longitude) {
                 const distance = this.calculateDistance(lat, lng, user.latitude, user.longitude);
-                return distance <= radius;
+        return distance <= radius;
             }
             return false;
-        });
+      });
     }
 
     const resultsWithProfiles = await Promise.all(filteredUsers.map(async (user) => {
