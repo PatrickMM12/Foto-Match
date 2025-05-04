@@ -1769,7 +1769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error: any) {
           console.error("Error fetching distinct specialties:", error);
           res.status(500).json({ message: "Server error fetching specialties", details: error.message });
-      }
+    }
   });
 
   const server = createServer(app);

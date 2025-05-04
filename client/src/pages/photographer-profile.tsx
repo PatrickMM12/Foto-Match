@@ -106,6 +106,29 @@ type ServiceAreaMutationPayload = {
     longitude: number | null;
 };
 
+// Helper function to render the Location Autocomplete Input
+const renderLocationInput = ({ field, fieldState }: { field: any; fieldState: any }) => {
+  console.log('Renderizando Controller de LocationAutocompleteInput'); // Log de renderização
+  return (
+    <div className='flex-1 w-full'>
+      <LocationAutocompleteInput
+        id="service-area-location"
+        label="Nova Localidade"
+        placeholder="Digite uma cidade ou região"
+        onPlaceSelected={(place) => {
+          console.log('Place Selected:', place); // Log original
+          field.onChange(place);
+        }}
+        initialValue={field.value === null ? '' : field.value?.name}
+        required
+      />
+      {fieldState.error && (
+        <p className="text-sm font-medium text-destructive mt-1">{fieldState.error.message}</p>
+      )}
+    </div>
+  );
+};
+
 const PhotographerProfile = () => {
   const { toast } = useToast();
 
@@ -700,14 +723,17 @@ const PhotographerProfile = () => {
                       <Controller
                         name="selectedPlace"
                         control={serviceAreaForm.control}
-                        render={({ field, fieldState }) => (
+                        render={({ field, fieldState }) => {
+                          // Retorna o JSX
+                          return (
                            <div className='flex-1 w-full'>
                             <LocationAutocompleteInput
                               id="service-area-location"
                               label="Nova Localidade"
                               placeholder="Digite uma cidade ou região"
-                              onPlaceSelected={(place) => field.onChange(place)} 
-                              // Reset input visually if form is reset externally
+                              onPlaceSelected={(place) => {
+                                field.onChange(place);
+                              }} 
                               initialValue={field.value === null ? '' : field.value?.name}
                               required
                             />
@@ -715,7 +741,8 @@ const PhotographerProfile = () => {
                                <p className="text-sm font-medium text-destructive mt-1">{fieldState.error.message}</p>
                              )}
                             </div>
-                        )}
+                          );
+                        }}
                       />
                     <Button type="submit" disabled={addServiceAreaMutation.isPending} className="w-full sm:w-auto">
                       {addServiceAreaMutation.isPending ? <LoadingSpinner size="sm" /> : 'Adicionar Área'}

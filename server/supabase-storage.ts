@@ -753,7 +753,7 @@ export class SupabaseStorage implements IStorage {
     
     console.log(`[DEBUG] storage.getSessions - Raw data count from Supabase: ${data.length}`); // Log dados brutos
     // console.log(`[DEBUG] storage.getSessions - First raw session data:`, JSON.stringify(data[0], null, 2)); // Descomentar se precisar ver a estrutura bruta
-
+    
     // Converter os campos de snake_case para camelCase e extrair nomes
     const sessions = data.map(session => {
       const clientData = session.client as { id: number; name: string; email: string } | null;
@@ -1277,12 +1277,12 @@ export class SupabaseStorage implements IStorage {
       .from('users')
       .select(`*, photographerProfile:photographer_profiles(*)`)
       .eq('user_type', 'photographer');
-      
-    if (query) { 
+
+    if (query) {
         const textQuery = `%${query}%`;
         queryBuilder = queryBuilder.or(`name.ilike.${textQuery},bio.ilike.${textQuery},location.ilike.${textQuery}`);
-     }
-     
+    }
+
     if (lat !== undefined && lng !== undefined && radius > 0) { 
         try {
             const { data: nearbyUsers, error: rpcError } = await supabase.rpc('nearby_users', {
@@ -1395,7 +1395,7 @@ export class SupabaseStorage implements IStorage {
       }) || [];
       return photographers as UserWithProfile[]; // Type assertion should be safe now
     } catch (err) { console.error("Unexpected Search By Location Error:", err); return []; }
-  }
+    }
 
   // Photographer Service Area Methods
   async getServiceAreas(userId: number): Promise<PhotographerServiceArea[]> {
